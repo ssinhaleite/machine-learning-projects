@@ -1,2 +1,4 @@
-# age-classifier
-Age classifier: given a brain mri, predict the age.
+# machine-learning-projects
+
+#Project 01
+- Predicting a person's age from brain MR images
