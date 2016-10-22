@@ -106,11 +106,11 @@ path = "data/set_train/*"
 #a = a.reshape( 278, 1 )
 
 #one mean for each 8x8 volume
-if not os.path.isfile( '8x8MeanTraining.txt' ):
+if not os.path.isfile( 'data/8x8MeanTraining.txt' ):
     meanFeature = calculate_8x8_mean( path )
-    write_feature( '8x8MeanTraining.txt', meanFeature )
+    write_feature( 'data/8x8MeanTraining.txt', meanFeature )
 else:
-    fileIO = open( '8x8MeanTraining.txt', 'r' )
+    fileIO = open( 'data/8x8MeanTraining.txt', 'r' )
     meanFeature = fileIO.readlines()
     fileIO.close()
 
@@ -119,7 +119,7 @@ a = a.reshape( 278, 22 * 26 * 22 )
 
 print( "training data - features - OK" )
 
-fileIO = open( 'targets.csv', 'r' )
+fileIO = open( 'data/targets.csv', 'r' )
 y = fileIO.readlines()
 fileIO.close()
 
@@ -160,18 +160,18 @@ path = "data/set_test/*"
 #    fileIO.close()
 
 #one mean for each 8x8 volume
-if not os.path.isfile( '8x8MeanTest.txt' ):
+if not os.path.isfile( 'data/8x8MeanTest.txt' ):
     meanFeature = calculate_8x8_mean( path )
-    write_feature( '8x8MeanTest.txt', meanFeature )
+    write_feature( 'data/8x8MeanTest.txt', meanFeature )
 else:
-    fileIO = open( '8x8MeanTest.txt', 'r' )
+    fileIO = open( 'data/8x8MeanTest.txt', 'r' )
     meanFeature = fileIO.readlines()
     fileIO.close()
     
 print( "test data - features - OK" )
 
 #writing answer
-fileIO = open( './submission.csv','w' )
+fileIO = open( 'data/submission.csv','w' )
 fileIO.write( 'ID,Prediction\n' )
 for i in range( len( meanFeature ) ):
     y_ = regression.predict( float( meanFeature[i] ) )

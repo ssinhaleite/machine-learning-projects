@@ -7,6 +7,8 @@ Created on Fri Oct 21 09:06:58 2016
 
 import numpy as np
 
+from sklearn import linear_model
+
 class Features:
     
     def __init__(self, datasetDic):
@@ -230,6 +232,32 @@ class Prediction:
         return parameters
         
         
+    def buildClassifier( self, labels, classifier = "LASSO"):
+        
+        featureMatrix = self.features
+        
+        #parameters of classifiers:
+        #copy_X: to copy the input data and do not overwrite
+        #n_jobs: number of jobs used for computation. -1 means all CPUs will be used
+        #cv: method for cross-validation. None means use Leave-one-out
+        
+        if classifier == "Linear regression":
+            clf = linear_model.LinearRegression(copy_X=True, n_jobs=-1, \
+                                                normalize=True)
+        elif classifier == "LASSO":
+            clf = linear_model.Lasso(alpha=0.1, copy_X=True, \
+                                     normalize=True, tol=0.0001)
+        elif classifier == "Ridge":
+            clf = linear_model.Ridge(alpha=0.5, copy_X=True, \
+                                     normalize=True, solver='lsqr', tol=0.001)
+        elif classifier == "RidgeCV": #ridge cross validation
+            clf = linear_model.RidgeCV( alphas=[0.1, 1.0, 10.0], cv=None, \
+                     normalize=True )
+
+        clf.fit( featureMatrix, labels )       
+        return clf, clf.coef_
+        
+            
     def predict(self, parameters, label="no label"):
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
