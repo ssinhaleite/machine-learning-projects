@@ -54,16 +54,17 @@ class Features:
         # features extraction:
         functionDic = {} # should be fulfill as soon as we add a new function
                          # for feature extraction !!!
+        functionDic["gridOperation"] = self.gridOperation
                     
         # In the following loop, we call the functions allowing to compute the \
         # features chosen by the users in the dictionary featureType:
         for k,v in featureType.items():
             if isinstance(v,dict): 
-                localFeatures = functionDic[k](self.dataset, **v)
+                localFeatures = functionDic[k](**v)
             else:
                 if v < 1:
                     v = 1
-                localFeatures = functionDic[k](self.dataset, npoly=v)
+                localFeatures = functionDic[k](npoly=v)	
                 
             featureMatrix = np.concatenate((featureMatrix, localFeatures), axis=1)
             
@@ -71,8 +72,7 @@ class Features:
             
 ###############################################################################          
             
-    def gridOperation(self, nGrid=(10,10), npoly=1, type2D="center", axis=2, \
-                      *typeOp):
+    def gridOperation(self, typeOp=["mean"], nGrid=(10,10), npoly=1, type2D="center", axis=2):
    
         # Dictionary containing the dataset:
         datasetDic = self.dataset
@@ -80,35 +80,34 @@ class Features:
         if npoly < 1:
             npoly = 1
             
-        if len(nGrid) < 2:
+        if len(nGrid) < 3:
             nDimension = 2
         else:
             nDimension = 3
             
-        if isinstance(typeOp,list) == False:
-            typeOp = [typeOp, ]
+        # Number of operations required by the user:
         nOp = len(typeOp)
         
         # Length (in points) of the grid along the different dimension:     
-        xlength = round(self.sizeX/nGrid[0])
-        ylength = round(self.sizeY/nGrid[1])
+        xlength = int(round(self.sizeX*nGrid[0]/100))
+        ylength = int(round(self.sizeY*nGrid[1]/100))
         
         if nDimension == 3:
-            zlength = round(self.sizeZ/nGrid[2])
+            zlength = int(round(self.sizeZ/nGrid[2]/100))
         
         # Number of subdivisions of the grid along each dimension: 
-        nGridX = np.ceil(self.sizeX / xlength) 
-        nGridY = np.ceil(self.sizeY / ylength) 
+        nGridX = int(np.ceil(self.sizeX / xlength))
+        nGridY = int(np.ceil(self.sizeY / ylength))
         if nDimension == 3:
-            nGridZ = np.ceil(self.sizeZ / zlength) 
-        
+            nGridZ = int(np.ceil(self.sizeZ / zlength))
+
         # Creation of the featureMatrix containing the features in a 4D/5D matrix:
         if nDimension == 2:
-            featureMatrix = np.empt([nGridX, nGridY, nOp, npoly])
-            features = np.empt([nGridX*nGridY*nOp*npoly, self.nData])
+            featureMatrix = np.empty([nGridX, nGridY, nOp, npoly])
+            features = np.empty([self.nData, nGridX*nGridY*nOp*npoly])
         elif nDimension == 3:
-            featureMatrix = np.empt([nGridX, nGridY, nGridZ, nOp, npoly])
-            features = np.empt([nGridX*nGridY*nGridZ*nOp*npoly, self.nData])
+            featureMatrix = np.empty([nGridX, nGridY, nGridZ, nOp, npoly])
+            features = np.empty([self.nData, nGridX*nGridY*nGridZ*nOp*npoly])
 
         for iDataset in range(self.nData):
             # Case of a 2D grid:
@@ -129,7 +128,7 @@ class Features:
                         image2D = datasetDic[iDataset][self.X0,:,:]
                     elif axis == 1:
                         image2D = datasetDic[iDataset][:,self.Y0,:]
-                    elif axis == 1:
+                    elif axis == 2:
                         image2D = datasetDic[iDataset][:,:,self.Z0]
                 elif type2D == "sum":
                     image2D = datasetDic[iDataset].sum(axis)
@@ -138,7 +137,7 @@ class Features:
                         image2D = datasetDic[iDataset][type2D,:,:]
                     elif axis == 1:
                         image2D = datasetDic[iDataset][:,type2D,:]
-                    elif axis == 1:
+                    elif axis == 2:
                         image2D = datasetDic[iDataset][:,:,type2D]
                 
             for iX in range(nGridX):
@@ -147,19 +146,19 @@ class Features:
                         gridZone = image2D[iX*xlength : (iX+1)*xlength, \
                                            iY*ylength : (iY+1)*ylength]                
                         for iPolyOrder in range(npoly):
-                            for Op in typeOp:
+                            for iOp, Op in enumerate(typeOp):
                                  if Op in ["average", "Average", "mean"]:
-                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                      np.mean(gridZone)**(iPolyOrder+1)
                                  elif Op in ["max", "Max"]:
-                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                      np.amax(gridZone)**(iPolyOrder+1)
                                  elif Op in ["min", "Min"]:
-                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                      np.amin(gridZone)**(iPolyOrder+1)
                                  elif Op in ["variance", "Var", "Expectation", \
                                              "expectation"]:
-                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                      np.var(gridZone)**(iPolyOrder+1)
                     elif nDimension == 3:
                         for iZ in range(nGridZ):
@@ -167,22 +166,22 @@ class Features:
                                                iY*ylength : (iY+1)*ylength, \
                                                iZ*zlength : (iZ+1)*zlength]                
                             for iPolyOrder in range(npoly):
-                                for Op in typeOp:
+                                for iOp, Op in enumerate(typeOp):
                                     if Op in ["average", "Average", "mean"]:
-                                        featureMatrix[iX, iY, iZ, Op, \
+                                        featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.mean(gridZone)**(iPolyOrder+1)
                                     elif Op in ["max", "Max"]:
-                                        featureMatrix[iX, iY, iZ, Op, \
+                                        featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.amax(gridZone)**(iPolyOrder+1)
                                     elif Op in ["min", "Min"]:
-                                        featureMatrix[iX, iY, iZ, Op, \
+                                        featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.amin(gridZone)**(iPolyOrder+1)
                                     elif Op in ["variance", "Var", \
                                                 "Expectation", "expectation"]:
-                                        featureMatrix[iX, iY, iZ, Op, \
+                                        featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.var(gridZone)**(iPolyOrder+1)
                                        
@@ -196,34 +195,78 @@ class Features:
             
 class Prediction:
     
-    def __init__(self, featuresMatrix):
+    def __init__(self, featuresMatrix, label):
         self.features = featuresMatrix
-        
+        self.label = label
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
         (self.nSamples, self.nFeatures) = featuresMatrix.shape
         
+        
+    def datasetSplit(self, ratioSplit = 0.8):		
+        # Number of samples in the entire dataset:		
+        nbSamples = self.nSamples		
+    		
+        # Number of images used for training:		
+        nTrain = round(ratioSplit * nbSamples)		
+    		
+        # Number of images used for validation:		
+        # nValid = nbSamples - nTrain		
+    		
+        shuffleIndex = np.arange(nbSamples)		
+        np.random.shuffle(shuffleIndex)		
+    		
+        # Indices of the training and validation datasets:		
+        trainIndex = shuffleIndex[:nTrain-1]		
+        validIndex = shuffleIndex[nTrain:]		
+        indexSplit = {"training":trainIndex, "validation":validIndex}		
+    		
+#       print ("Training and validation dataset indexes created. Average age:\n\		
+#       Training dataset: {} y.o\nvalidation dataset: {} y.o".format(int(round(labelTrain.mean())), \		
+#       int(round(labelValid.mean()))))		
+    		
+        labelValidation = self.label[indexSplit["validation"]]		
+    		
+        return indexSplit, labelValidation		
+    		
+        		
+    def featureSplit (self, ratioSplit=0.8, **indexSplit):		
+        if len(indexSplit) == 0:		
+            indexSplit = self.datasetSplit(int(ratioSplit)	)	
+        		
+        # Labels of the training and validation datasets:		
+        featureDic = {}		
+        featureDic["training"] = self.features[indexSplit["training"], :]		
+        featureDic["validation"] = self.features[indexSplit["validation"], :]		
+        return featureDic
+        
     
-    def modelParameters(self, label, shrinkageParameter = 0, technique = "LS"):
+    def modelParameters(self, featureDic=[], shrinkageParameter = 0, technique = "LS"):
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
         nbSamples = self.nSamples
         nbFeatures = self.nFeatures
+
+        if len(featureDic) == 0: 		
+            featureDic = {"training": self.features}		
             
         # Choice of the method:
         if shrinkageParameter == 0:
             technique = "LS"
+        else:
+            technique = "Ridge"
             
         if technique in ["Least square", "least square", "LS"]:
-            featureMatrix = self.features
+            featureMatrix = featureDic["training"]
         elif technique in ["Ridge", "ridge", "Ridge regression", "ridge regression"]:
             featureMatrix = np.zeros([ nbSamples + nbFeatures, nbFeatures ])
-            featureMatrix[:nbSamples-1,:] = self.features
+            featureMatrix[:nbSamples-1,:] = featureDic["training"]
             # The lower part of the feature matrix becomes the identity matrix
             # times the shrinkage parameter:
             featureMatrix[nbSamples,:] = np.sqrt(shrinkageParameter)* \
                 np.identity(nbFeatures)     
-            label = np.concatenate((label,np.zeros(nbFeatures)))
+
+        label = np.concatenate((self.label,np.zeros(nbFeatures)))
         
         # To compute the parameters of the model, minimizing the least square 
         # of sum(|y-ax|²), the function lstsq is used: 
@@ -258,7 +301,7 @@ class Prediction:
         return clf, clf.coef_
         
             
-    def predict(self, parameters, label="no label"):
+    def predict(self, parameters, labelValidation=[]):
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
         nbSamples = self.nSamples
@@ -266,16 +309,16 @@ class Prediction:
         # Prediction of the model for the given dataset:
         predictedData = parameters * self.features
         
-        if isinstance(label, np.array):
+        if len(labelValidation) != 0:
             
             # Computation of the mean squared error of the predicted data:
-            MSE = round(np.mean((predictedData - label)**2), 2) 
+            MSE = round(np.mean((predictedData - labelValidation)**2), 2) 
             
             print("The achieved score is: " + str(MSE))
             
             # we sort the label (ascending order) and the predicted data:
-            indexSort = np.argsort(label)
-            labelSort = label(indexSort)
+            indexSort = np.argsort(labelValidation)
+            labelSort = labelValidation(indexSort)
             predictedDataSort = predictedData(indexSort)
             
             # X-axis:
