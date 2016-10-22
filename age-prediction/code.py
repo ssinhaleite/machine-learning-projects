@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import RidgeCV
 
 #one mean for each image
-completeMean = []
+meanFeature = []
 
 #code show_slices from: http://nipy.org/nibabel/coordinate_systems.html#introducing-someone
 def show_slices( slices ):
@@ -30,7 +30,7 @@ def calculate_mean( path ):
     xShape = 176
     yShape = 208
     zShape = 176
-    completeMean = []
+    meanFeature = np.zeros( ( len( files ), 1 ) )
     # for all files in the folder
     for i in range( len( files ) ):
         #load file
@@ -48,10 +48,38 @@ def calculate_mean( path ):
                     sum_intensities += X_data[x,y,z,0]
                     if X_data[x,y,z,0] > 0:
                         voxels += 1
-        completeMean.append( sum_intensities/voxels )
-        print ( completeMean[i] )
-    return completeMean
+        meanFeature.append( sum_intensities/voxels )
+        print ( meanFeature[i] )
+    return meanFeature
 
+#------------------------------------------------------------------------------------------
+def calculate_8x8_mean( path ):
+    files = glob.glob( path )
+    files.sort()
+    #dimension of the data is 176 208 176
+    xShape = 22 #176/8
+    yShape = 26 #208/8
+    zShape = 28 #176/8
+    
+    meanFeature = np.zeros( ( len( files ), 22 * 26 * 22 ) )
+    # for all files in the folder
+    for i in range( len( files ) ):
+        #load file
+        img = nib.load( files[i] )
+        print( "Image ", i )
+        #get the data (one file)
+        X_data = img.get_data()
+        X_data_float64 = X_data.astype(np.float64)
+        
+        #calculate mean for all image
+        sum_intensities = 0
+        for x in range( xShape ):
+            for y in range( yShape ):
+                for z in range( zShape ):
+                    image = X_data_float64[(8 * x):(8 * x + 8), (8 * y):(8 * y + 8), (8 * z):(8 * z + 8)]
+                    img_ravel = image.ravel()
+                    meanFeature[i, 26 * 22 * x + 22 * y + z] = np.mean( img_ravel )
+    return meanFeature
 #---------------------------------------------------------------------
 
 def write_feature( path, feature ):
@@ -64,13 +92,31 @@ def write_feature( path, feature ):
 
 #training data
 path = "data/set_train/*"
-if not os.path.isfile( 'completeMeanTraining.txt' ):
-    completeMean = calculate_mean( path )
-    write_feature( 'completeMeanTraining.txt', completeMean )
+
+#one mean for all the volume
+#if not os.path.isfile( 'completeMeanTraining.txt' ):
+#    meanFeature = calculate_mean( path )
+#    write_feature( 'completeMeanTraining.txt', meanFeature )
+#else:
+#    fileIO = open( 'completeMeanTraining.txt', 'r' )
+#    meanFeature = fileIO.readlines()
+#    fileIO.close()
+
+#a = np.array( meanFeature ).astype( np.float )
+#a = a.reshape( 278, 1 )
+
+#one mean for each 8x8 volume
+if not os.path.isfile( '8x8MeanTraining.txt' ):
+    meanFeature = calculate_8x8_mean( path )
+    write_feature( '8x8MeanTraining.txt', meanFeature )
 else:
-    fileIO = open( 'completeMeanTraining.txt', 'r' )
-    completeMean = fileIO.readlines()
+    fileIO = open( '8x8MeanTraining.txt', 'r' )
+    meanFeature = fileIO.readlines()
     fileIO.close()
+
+a = np.array( meanFeature ).astype( np.float )
+a = a.reshape( 278, 22 * 26 * 22 )
+
 print( "training data - features - OK" )
 
 fileIO = open( 'targets.csv', 'r' )
@@ -79,10 +125,10 @@ fileIO.close()
 
 print( "training data - answers - OK" )
 
-a = np.array( completeMean ).astype( np.float )
-a = a.reshape( 278, 1 )
 b = np.array( y ).astype( np.float )
 b = b.reshape( 278, 1 )
+
+print(a.size)
 
 #divide the training data for training and validation
 x_train, x_test, y_train, y_test = train_test_split( a, b, test_size = 0.33 )
@@ -103,20 +149,32 @@ print( mean_squared_error( y_test, ( regression.predict( x_test ) ) ) )
 
 #test data
 path = "data/set_test/*"
-if not os.path.isfile( 'completeMeanTest.txt' ):
-    calculate_mean( path )
-    write_feature( 'completeMeanTest.txt', completeMean )
+
+#one mean for all the volume
+#if not os.path.isfile( 'completeMeanTest.txt' ):
+#    meanFeature = calculate_mean( path )
+#    write_feature( 'completeMeanTest.txt', meanFeature )
+#else:
+#    fileIO = open( 'completeMeanTest.txt', 'r' )
+#    meanFeature = fileIO.readlines()
+#    fileIO.close()
+
+#one mean for each 8x8 volume
+if not os.path.isfile( '8x8MeanTest.txt' ):
+    meanFeature = calculate_8x8_mean( path )
+    write_feature( '8x8MeanTest.txt', meanFeature )
 else:
-    fileIO = open( 'completeMeanTest.txt', 'r' )
-    completeMean = fileIO.readlines()
+    fileIO = open( '8x8MeanTest.txt', 'r' )
+    meanFeature = fileIO.readlines()
     fileIO.close()
+    
 print( "test data - features - OK" )
 
 #writing answer
 fileIO = open( './submission.csv','w' )
 fileIO.write( 'ID,Prediction\n' )
-for i in range( len( completeMean ) ):
-    y_ = regression.predict( float( completeMean[i] ) )
+for i in range( len( meanFeature ) ):
+    y_ = regression.predict( float( meanFeature[i] ) )
     print( y_ )
     fileIO.write( str(i+1) + ',' + str(y_) + '\n' )
 fileIO.close()
