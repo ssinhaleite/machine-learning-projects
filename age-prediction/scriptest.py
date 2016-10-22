@@ -140,8 +140,8 @@ the following construction rules:
         be interpreted as the polynomial order on which we want to fit 
         the given feature
 """
-featureDic = {"gridOperation": { nGrid=(10,10), npoly=1, type2D="center",  \
-                      axis=2, "mean"} } 
+#featureDic = {"gridOperation": { nGrid=(10,10), npoly=1, type2D="center",  \
+#                      axis=2, "mean"} } 
 
 # Number of features:
 #nFeatures = 

@@ -11,9 +11,9 @@ class Features:
     
     def __init__(self, datasetDic):
         self.dataset = datasetDic
-        self.nData =  self.dataset.length() 
+        self.nData =  len( self.dataset ) 
         
-        self.size3D = self.datasetDic[0].shape
+        self.size3D = self.dataset[0].shape
         (self.sizeX, self.sizeY, self.sizeZ) = self.size3D
         
         # Central positions along x, y, z:
@@ -100,13 +100,17 @@ class Features:
         if nDimension == 3:
             nGridZ = np.ceil(self.sizeZ / zlength) 
         
-        # Creation of the featureMatrix containing the features in a 5D matrix:
+        # Creation of the featureMatrix containing the features in a 4D/5D matrix:
         if nDimension == 2:
             featureMatrix = np.empt([nGridX, nGridY, nOp, npoly])
             features = np.empt([nGridX*nGridY*nOp*npoly, self.nData])
-        # Case of a 2D grid:
-        if nDimension == 2:
-            for iDataset in range(self.nData):
+        elif nDimension == 3:
+            featureMatrix = np.empt([nGridX, nGridY, nGridZ, nOp, npoly])
+            features = np.empt([nGridX*nGridY*nGridZ*nOp*npoly, self.nData])
+
+        for iDataset in range(self.nData):
+            # Case of a 2D grid:
+            if nDimension == 2:
                 # The grid operation is repeated for the 2D image given by the
                 # input variable type2D:
                 #   type2D == "center" --> the following 2D image:
@@ -135,27 +139,52 @@ class Features:
                     elif axis == 1:
                         image2D = datasetDic[iDataset][:,:,type2D]
                 
-                for iX in range(nGridX):
-                    for iY in range(nGridY):
+            for iX in range(nGridX):
+                for iY in range(nGridY):
+                    if nDimension == 2:
                         gridZone = image2D[iX*xlength : (iX+1)*xlength, \
                                            iY*ylength : (iY+1)*ylength]                
                         for iPolyOrder in range(npoly):
                             for Op in typeOp:
-                                if Op in ["average", "Average", "mean"]:
-                                    featureMatrix[iX, iY, Op, iPolyOrder] = \
-                                    np.mean(gridZone)**(iPolyOrder+1)
-                                elif Op in ["max", "Max"]:
-                                    featureMatrix[iX, iY, Op, iPolyOrder] = \
-                                    np.amax(gridZone)**(iPolyOrder+1)
-                                elif Op in ["min", "Min"]:
-                                    featureMatrix[iX, iY, Op, iPolyOrder] = \
-                                    np.amin(gridZone)**(iPolyOrder+1)
-                                elif Op in ["variance", "Var", "Expectation", \
-                                            "expectation"]:
-                                    featureMatrix[iX, iY, Op, iPolyOrder] = \
-                                    np.var(gridZone)**(iPolyOrder+1)
+                                 if Op in ["average", "Average", "mean"]:
+                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     np.mean(gridZone)**(iPolyOrder+1)
+                                 elif Op in ["max", "Max"]:
+                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     np.amax(gridZone)**(iPolyOrder+1)
+                                 elif Op in ["min", "Min"]:
+                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     np.amin(gridZone)**(iPolyOrder+1)
+                                 elif Op in ["variance", "Var", "Expectation", \
+                                             "expectation"]:
+                                     featureMatrix[iX, iY, Op, iPolyOrder] = \
+                                     np.var(gridZone)**(iPolyOrder+1)
+                    elif nDimension == 3:
+                        for iZ in range(nGridZ):
+                            gridZone = image2D[iX*xlength : (iX+1)*xlength, \
+                                               iY*ylength : (iY+1)*ylength, \
+                                               iZ*zlength : (iZ+1)*zlength]                
+                            for iPolyOrder in range(npoly):
+                                for Op in typeOp:
+                                    if Op in ["average", "Average", "mean"]:
+                                        featureMatrix[iX, iY, iZ, Op, \
+                                                      iPolyOrder] = \
+                                        np.mean(gridZone)**(iPolyOrder+1)
+                                    elif Op in ["max", "Max"]:
+                                        featureMatrix[iX, iY, iZ, Op, \
+                                                      iPolyOrder] = \
+                                        np.amax(gridZone)**(iPolyOrder+1)
+                                    elif Op in ["min", "Min"]:
+                                        featureMatrix[iX, iY, iZ, Op, \
+                                                      iPolyOrder] = \
+                                        np.amin(gridZone)**(iPolyOrder+1)
+                                    elif Op in ["variance", "Var", \
+                                                "Expectation", "expectation"]:
+                                        featureMatrix[iX, iY, iZ, Op, \
+                                                      iPolyOrder] = \
+                                        np.var(gridZone)**(iPolyOrder+1)
                                        
-            # We flatten the 5D featureMatrix:
+            # We flatten the 4D/5D featureMatrix:
             features[iDataset,:] = featureMatrix.flatten()
             
         return features
