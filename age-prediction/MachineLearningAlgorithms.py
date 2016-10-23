@@ -196,7 +196,7 @@ class Features:
             
 class Prediction:
     
-    def __init__(self, featuresMatrix, label):
+    def __init__(self, featuresMatrix, label=[]):
         self.features = featuresMatrix
         self.label = label
         # Number of elements in the dataset used for computing the features 
@@ -224,10 +224,13 @@ class Prediction:
     		
 #       print ("Training and validation dataset indexes created. Average age:\n\		
 #       Training dataset: {} y.o\nvalidation dataset: {} y.o".format(int(round(labelTrain.mean())), \		
-#       int(round(labelValid.mean()))))		
-    		
-        labelTraining = self.label[indexSplit["training"]]
-        labelValidation = self.label[indexSplit["validation"]]		
+#       int(round(labelValid.mean()))))	
+
+        labelTraining=[]
+        labelValidation=[]
+        if len(self.label) != 0:	
+            labelTraining = self.label[indexSplit["training"]]
+            labelValidation = self.label[indexSplit["validation"]]		
     		
         return indexSplit, labelTraining, labelValidation		
     		
@@ -355,7 +358,7 @@ class Prediction:
             plt.xlabel("Patient number")
             plt.ylabel("Age")
             
-            pylab.show()
+            #pylab.show()
             
         return predictedData
         
