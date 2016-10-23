@@ -70,10 +70,12 @@ def featuresExtraction( ml, datasetDic):
     #featureDic = {"gridOperation": { "nGrid":(50,50), "npoly":1, "type2D":"center",   \
     #                                 "axis":2, "typeOp":["mean"]} } 
 
-    featureDic = {"gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["mean"]}, \
- #                 "gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["min"]}, \
- #                 "gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["max"]}, \
-                  "gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["var"]} \
+    featureDic = {#"gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["mean"]}, \
+                  #"gridOperation": { "nGrid":(176,208), "npoly":1, "typeOp":["mean"]}, \
+                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["mean"]}, \
+                  #"gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["sum"]}, \
+#                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["cov"]}, \
+                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["var"]} \
                  } 
 
     # Use of the function featureExtraction to extract the features selected in the		
@@ -122,7 +124,7 @@ data2Predict = ml.Prediction(featureMatrix, label)
 # training, the other for the validation:		
 # Ratio of the overall training dataset used for real training and used for 		
 # validation:		
-indexSplit, labelTraining, labelValidation = data2Predict.datasetSplit(ratioSplit = 0.7)		
+indexSplit, labelTraining, labelValidation = data2Predict.datasetSplit(ratioSplit = 0.8)		
 print("Training and validation datasets created")		
 
 #%% MODEL PARAMETER COMPUTATION:		
@@ -133,14 +135,14 @@ featureDic = data2Predict.featureSplit (**indexSplit)
 # function modelParameters:		
 #parameters = data2Predict.modelParameters(featureDic, shrinkageParameter = 0, \
 #                                          technique = "LS")		
-clf, parameters = data2Predict.buildClassifier(featureDic, labelTraining, classifier = "RidgeCV")		
+clf, parameters = data2Predict.buildClassifier(featureDic, labelTraining, classifier = "Ridge")		
 
 print("The parameters of the model has been computed")	
 	
 #%% VALIDATION OF THE MODEL:		
 # We use the validation dataset to compute the mean squared error between the 		
 # labels calculated with our model and the real labels:		
-predictedData = data2Predict.predict(parameters, featureDic, labelValidation)		
+predictedData = data2Predict.predict(parameters, featureDic, labelValidation, clf)		
 #%% LOADING OF THE NON-LABELED DATASET:    
 # Loading of the images from the test dataset:
 path = "data/" 
@@ -159,14 +161,12 @@ featureMatrix = featuresExtraction( ml, datasetDic)
 
 # We create an object of the class Prediction from the trainDataset dictionary:		
 unlabeledData= ml.Prediction(featureMatrix)
-#ratio = 0 == all data is validation
-#indexSplit = unlabeledData.datasetSplit(ratioSplit = 0)
-#featureDic = unlabeledData.featureSplit (**indexSplit)
+#all data should be predicted
 featureDic["validation"] = featureMatrix	
-newPrediction = unlabeledData.predict(parameters, featureDic)
+newPrediction = unlabeledData.predict(parameters, featureDic, clf=clf)
 
 #%% WRITING ANSWER
-fileIO = open( 'data/newSubmission.csv','w' )
+fileIO = open( 'data/submission-SVR-Linear-mean-Features3D-alpha1.csv','w' )
 fileIO.write( 'ID,Prediction\n' )
 answer = np.rint(newPrediction).astype(int)
 for i in range( len( newPrediction ) ):

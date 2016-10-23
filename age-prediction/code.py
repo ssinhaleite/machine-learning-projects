@@ -10,6 +10,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn import linear_model
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import RidgeCV
+from sklearn.svm import SVR
 
 #one mean for each image
 meanFeature = []
@@ -59,7 +60,7 @@ def calculate_8x8_mean( path ):
     #dimension of the data is 176 208 176
     xShape = 22 #176/8
     yShape = 26 #208/8
-    zShape = 28 #176/8
+    zShape = 22 #176/8
     
     meanFeature = np.zeros( ( len( files ), 22 * 26 * 22 ) )
     # for all files in the folder
@@ -139,9 +140,10 @@ x_train, x_test, y_train, y_test = train_test_split( a, b, test_size = 0.33 )
 
 print( "data separated for training and validation" )
 
-regression = linear_model.RidgeCV( alphas=[0.1, 1.0, 10.0] )
+#regression = linear_model.RidgeCV( alphas=[0.1, 1.0, 10.0] )
+regression = SVR(kernel='rbf', C=1e3, gamma=0.1)
 regression.fit( x_train, y_train )       
-RidgeCV( alphas=[0.1, 1.0, 10.0], cv=None, fit_intercept=True, scoring=None, normalize=False )
+#RidgeCV( alphas=[0.1, 1.0, 10.0], cv=None, fit_intercept=True, scoring=None, normalize=False )
 print( "RidgeCV trained" )
 
 #The mean square error
@@ -173,10 +175,9 @@ print( "test data - features - OK" )
 #writing answer
 fileIO = open( 'data/submission.csv','w' )
 fileIO.write( 'ID,Prediction\n' )
-for i in range( len( meanFeature ) ):
-    y_ = regression.predict( float( meanFeature[i] ) )
-    print( y_ )
-    fileIO.write( str(i+1) + ',' + str(y_) + '\n' )
+y_ = regression.predict( meanFeature )
+for i in range( len( y_ ) ):
+    fileIO.write( str(i+1) + ',' + str(y_[i]).strip('[]') + '\n' )
 fileIO.close()
 
 

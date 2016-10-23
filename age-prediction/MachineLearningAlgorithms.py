@@ -9,6 +9,10 @@ import numpy as np
 
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
+from sklearn.svm import SVR
+from sklearn.svm import NuSVR
+from sklearn.svm import LinearSVR
+from sklearn import preprocessing
 
 class Features:
     
@@ -92,7 +96,7 @@ class Features:
         # Length (in points) of the grid along the different dimension:     
         xlength = int(round(self.sizeX*nGrid[0]/100))
         ylength = int(round(self.sizeY*nGrid[1]/100))
-        
+                    
         if nDimension == 3:
             zlength = int(round(self.sizeZ*nGrid[2]/100))
         
@@ -110,6 +114,16 @@ class Features:
             featureMatrix = np.empty([nGridX, nGridY, nGridZ, nOp, npoly])
             features = np.empty([self.nData, nGridX*nGridY*nGridZ*nOp*npoly])
 
+        if nGrid[0]==176:
+            print(xlength)
+            print(ylength)
+            print(zlength)
+            print(nGridX)
+            print(nGridY)
+            print(nGridZ)
+            print(features.shape)
+
+            
         for iDataset in range(self.nData):
             # Case of a 2D grid:
             if nDimension == 2:
@@ -172,6 +186,12 @@ class Features:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.mean(gridZone)**(iPolyOrder+1)
+                                        if np.isnan(featureMatrix[iX, iY, iZ, iOp, \
+                                                      iPolyOrder]) or \
+                                           np.isinf(featureMatrix[iX, iY, iZ, iOp, \
+                                                      iPolyOrder]): 
+                                               featureMatrix[iX, iY, iZ, iOp, \
+                                                      iPolyOrder] = 0.0
                                     elif Op in ["max", "Max"]:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
@@ -185,6 +205,14 @@ class Features:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.var(gridZone)**(iPolyOrder+1)
+                                    elif Op in ["covariance", "cov"]:
+                                        featureMatrix[iX, iY, iZ, iOp, \
+                                                      iPolyOrder] = \
+                                        np.cov(gridZone)**(iPolyOrder+1)
+                                    elif Op in ["sum", "Sum"]:
+                                        featureMatrix[iX, iY, iZ, iOp, \
+                                                      iPolyOrder] = \
+                                        np.sum(gridZone)**(iPolyOrder+1)
                                        
             # We flatten the 4D/5D featureMatrix:
             features[iDataset,:] = featureMatrix.flatten()
@@ -291,41 +319,72 @@ class Prediction:
         
         if classifier == "Linear regression":
             clf = linear_model.LinearRegression(copy_X=True, n_jobs=-1, \
-                                                normalize=True)
+                                                normalize=False)
         elif classifier == "LASSO":
             clf = linear_model.Lasso(alpha=0.1, copy_X=True, \
                                      normalize=True, tol=0.0001)
         elif classifier == "Ridge":
-            clf = linear_model.Ridge(alpha=0.5, copy_X=True, \
-                                     normalize=True, solver='lsqr', tol=0.001)
+            clf = linear_model.Ridge(alpha=1.0, copy_X=True, \
+                                     normalize=True, solver='auto', tol=0.001)
         elif classifier == "RidgeCV": #ridge cross validation
-            clf = linear_model.RidgeCV( alphas=[0.1, 1.0, 10.0], cv=None, fit_intercept=True, normalize=True )
-        
-        #label = np.concatenate((self.label,np.zeros(self.nFeatures)))
+            clf = linear_model.RidgeCV(alphas=[0.1, 0.5, 1.0, 10.0], cv=None, \
+                                       fit_intercept=True, normalize=True )
+        elif classifier == "SVR-RBF": #support vector regression with Radial Basis Function kernel
+            clf = SVR(kernel='rbf', C=1e3, gamma=0.1)
+        elif classifier == "SVR-Linear": #support vector regression with linear kernel
+            print("SVR-linear")
+            clf = LinearSVR( C=1, epsilon=0 )
+
+            
         label = label.reshape( label.size, 1 )
         print("Feature shape: ", featureMatrix.shape)
         print("Label shape: ", label.shape)
+        
+#        X_scaled = preprocessing.scale(featureMatrix)
+#        min_max_scaler = preprocessing.MinMaxScaler()
+#        X_train_minmax = min_max_scaler.fit_transform(featureMatrix)
+#        feature_min = np.min(featureMatrix, axis=0)
+#        feature_max = np.max(featureMatrix, axis=0)
+#        diff = feature_max - feature_min
+#        print(feature_max)
+#        print(feature_min)
+#        print(diff)
+#        featureMatrix_normalized = 1 - (((feature_max - featureMatrix)) / diff)
 
-        clf.fit( featureMatrix, label )    
-        parameters = clf.coef_
-        parameters = parameters.reshape( clf.coef_.size, 1)
+#        label = np.ravel(label)
+#        np.linalg.norm
+#        print(featureMatrix.max(axis=0))
+#        featureMatrix_normalized = featureMatrix / featureMatrix.max(axis=0)
+        clf.fit( featureMatrix, label )
+        
+        parameters =[]
+        if classifier != "SVR-RBF":
+            parameters = clf.coef_
+            parameters = parameters.reshape( clf.coef_.size, 1)
+            print("calculou coef")
         
         #print( mean_squared_error( y_test, ( regression.predict( x_test ) ) ) )
         
         return clf, parameters
         
             
-    def predict(self, parameters, featureDic=[], labelValidation=[]):
+    def predict(self, parameters, featureDic=[], labelValidation=[], clf=[]):
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
         features = featureDic["validation"]
         nbSamples = features.shape[0]
 
-        print(features.shape)
-        print(parameters.shape)
+#        print(features.shape)
+#        print(parameters.shape)
         
         # Prediction of the model for the given dataset:
-        predictedData = features.dot( parameters )
+        if len(parameters) == 0:
+            predictedData = clf.predict(features)
+            print("clf predict")
+        else:
+            predictedData = features.dot( parameters )
+            
+        predictedData = np.rint(predictedData)
         
         print("Predicted data: ", predictedData.shape)
         
@@ -358,7 +417,7 @@ class Prediction:
             plt.xlabel("Patient number")
             plt.ylabel("Age")
             
-            #pylab.show()
+            pylab.show()
             
         return predictedData
         
