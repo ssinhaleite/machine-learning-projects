@@ -8,6 +8,7 @@ Created on Fri Oct 21 09:06:58 2016
 import numpy as np
 
 from sklearn import linear_model
+from sklearn.metrics import mean_squared_error
 
 class Features:
     
@@ -93,7 +94,7 @@ class Features:
         ylength = int(round(self.sizeY*nGrid[1]/100))
         
         if nDimension == 3:
-            zlength = int(round(self.sizeZ/nGrid[2]/100))
+            zlength = int(round(self.sizeZ*nGrid[2]/100))
         
         # Number of subdivisions of the grid along each dimension: 
         nGridX = int(np.ceil(self.sizeX / xlength))
@@ -162,7 +163,7 @@ class Features:
                                      np.var(gridZone)**(iPolyOrder+1)
                     elif nDimension == 3:
                         for iZ in range(nGridZ):
-                            gridZone = image2D[iX*xlength : (iX+1)*xlength, \
+                            gridZone = datasetDic[iDataset][iX*xlength : (iX+1)*xlength, \
                                                iY*ylength : (iY+1)*ylength, \
                                                iZ*zlength : (iZ+1)*zlength]                
                             for iPolyOrder in range(npoly):
@@ -179,7 +180,7 @@ class Features:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.amin(gridZone)**(iPolyOrder+1)
-                                    elif Op in ["variance", "Var", \
+                                    elif Op in ["variance", "var", \
                                                 "Expectation", "expectation"]:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
@@ -225,9 +226,10 @@ class Prediction:
 #       Training dataset: {} y.o\nvalidation dataset: {} y.o".format(int(round(labelTrain.mean())), \		
 #       int(round(labelValid.mean()))))		
     		
+        labelTraining = self.label[indexSplit["training"]]
         labelValidation = self.label[indexSplit["validation"]]		
     		
-        return indexSplit, labelValidation		
+        return indexSplit, labelTraining, labelValidation		
     		
         		
     def featureSplit (self, ratioSplit=0.8, **indexSplit):		
@@ -275,10 +277,10 @@ class Prediction:
         return parameters
         
         
-    def buildClassifier( self, labels, classifier = "LASSO"):
+    def buildClassifier( self, featureDic=[], labelTraining=[], classifier = "LASSO"):
         
-        featureMatrix = self.features
-        
+        label = labelTraining	
+        featureMatrix = featureDic["training"]
         #parameters of classifiers:
         #copy_X: to copy the input data and do not overwrite
         #n_jobs: number of jobs used for computation. -1 means all CPUs will be used
@@ -294,45 +296,66 @@ class Prediction:
             clf = linear_model.Ridge(alpha=0.5, copy_X=True, \
                                      normalize=True, solver='lsqr', tol=0.001)
         elif classifier == "RidgeCV": #ridge cross validation
-            clf = linear_model.RidgeCV( alphas=[0.1, 1.0, 10.0], cv=None, \
-                     normalize=True )
+            clf = linear_model.RidgeCV( alphas=[0.1, 1.0, 10.0], cv=None, fit_intercept=True, normalize=True )
+        
+        #label = np.concatenate((self.label,np.zeros(self.nFeatures)))
+        label = label.reshape( label.size, 1 )
+        print("Feature shape: ", featureMatrix.shape)
+        print("Label shape: ", label.shape)
 
-        clf.fit( featureMatrix, labels )       
-        return clf, clf.coef_
+        clf.fit( featureMatrix, label )    
+        parameters = clf.coef_
+        parameters = parameters.reshape( clf.coef_.size, 1)
+        
+        #print( mean_squared_error( y_test, ( regression.predict( x_test ) ) ) )
+        
+        return clf, parameters
         
             
-    def predict(self, parameters, labelValidation=[]):
+    def predict(self, parameters, featureDic=[], labelValidation=[]):
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
-        nbSamples = self.nSamples
+        features = featureDic["validation"]
+        nbSamples = features.shape[0]
+
+        print(features.shape)
+        print(parameters.shape)
         
         # Prediction of the model for the given dataset:
-        predictedData = parameters * self.features
+        predictedData = features.dot( parameters )
+        
+        print("Predicted data: ", predictedData.shape)
         
         if len(labelValidation) != 0:
             
             # Computation of the mean squared error of the predicted data:
-            MSE = round(np.mean((predictedData - labelValidation)**2), 2) 
+            MSE = round(np.mean((predictedData - labelValidation)**2)) 
             
             print("The achieved score is: " + str(MSE))
             
+            print( " MSE: ", mean_squared_error( labelValidation, predictedData ) )
+            
             # we sort the label (ascending order) and the predicted data:
             indexSort = np.argsort(labelValidation)
-            labelSort = labelValidation(indexSort)
-            predictedDataSort = predictedData(indexSort)
+            labelSort = np.array(labelValidation[indexSort])
+            predictedDataSort = np.array(predictedData[indexSort])
             
             # X-axis:
-            x = np.linespace(1, nbSamples, nbSamples)
+            x = np.linspace(1, nbSamples, nbSamples)
+            print("number of samples: ", nbSamples)
             
             import matplotlib.pyplot as plt
+            import pylab
             plt.figure(100)
             plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
                      linestyle='--', marker='o')
-            plt.plot(x, labelSort, color="blue", linewidth=1, \
+            plt.plot(x, labelSort, color="red", linewidth=1, \
                      linestyle='--', marker='o')
             plt.title("Validation of the model")
             plt.xlabel("Patient number")
             plt.ylabel("Age")
+            
+            pylab.show()
             
         return predictedData
         

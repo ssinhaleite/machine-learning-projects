@@ -66,9 +66,9 @@ for i in range(nSamples):
     # Tranforming the images into data (3d matrix):
     datasetDic[i] = imageRaw.get_data()[xLimMin:xSize-xLimMax, \
     yLimMin:ySize-yLimMax, zLimMin:zSize-zLimMax, 0]
-    
-    print("\nThe dataset dictionary containing all the 3D images of the labeled \
-          dataset has been created")		
+
+
+print("\nThe dataset dictionary containing all the 3D images of the labeled dataset has been created")		
 
 #%% FEATURES EXTRACTION:
 ml = importlib.reload(ml)
@@ -88,8 +88,15 @@ the following construction rules:
         be interpreted as the polynomial order on which we want to fit 
         the given feature
 """
-featureDic = {"gridOperation": { "nGrid":(50,50), "npoly":1, "type2D":"center",   \
-                                 "axis":2, "typeOp":["mean"]} } 
+#featureDic = {"gridOperation": { "nGrid":(50,50), "npoly":1, "type2D":"center",   \
+#                                 "axis":2, "typeOp":["mean"]} } 
+
+featureDic = {"gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["mean"]}, \
+              "gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["min"]}, \
+              "gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["max"]}, \
+              "gridOperation": { "nGrid":(5,5,5), "npoly":1, "typeOp":["var"]} \
+             } 
+
 
 # Use of the function featureExtraction to extract the features selected in the		
 # dictionary featureDic:		
@@ -98,6 +105,7 @@ featureMatrix = dataSet.featureExtraction(**featureDic)
 # Number of features:
 nFeatures = featureMatrix.shape[1]		#nFeatures = 
 print("The features matrix is computed. There are {} different features".format(nFeatures))		
+
 #%% CREATION OF THE TRAINING AND VALIDATION DATASETS:		
 # We create an object of the class Prediction from the trainDataset dictionary:		
 data2Predict = ml.Prediction(featureMatrix, label)		
@@ -106,21 +114,25 @@ data2Predict = ml.Prediction(featureMatrix, label)
 # Ratio of the overall training dataset used for real training and used for 		
 # validation:		
 ratioTV = 1		
-indexSplit, labelValidation = data2Predict.datasetSplit(ratioSplit = 0.8)		
+indexSplit, labelTraining, labelValidation = data2Predict.datasetSplit(ratioSplit = 0.7)		
 print("Training and validation datasets created")		
+
 #%% MODEL PARAMETER COMPUTATION:		
 # Once we have the indices creating the 2 datasets, we can determine the two 		
 # datasets using the function featureSplit:		
 featureDic = data2Predict.featureSplit (**indexSplit)		
 # The parameters of the model are computed on the training data set using the 		
 # function modelParameters:		
-parameters = data2Predict.modelParameters(featureDic, shrinkageParameter = 0, \
-                                          technique = "LS")		
-print("The parameters of the model has been computed")		
+#parameters = data2Predict.modelParameters(featureDic, shrinkageParameter = 0, \
+#                                          technique = "LS")		
+clf, parameters = data2Predict.buildClassifier(featureDic, labelTraining, classifier = "RidgeCV")		
+
+print("The parameters of the model has been computed")	
+	
 #%% VALIDATION OF THE MODEL:		
 # We use the validation dataset to compute the mean squared error between the 		
 # labels calculated with our model and the real labels:		
-predictedData = data2Predict.predict(parameters, labelValidation)		
+predictedData = data2Predict.predict(parameters, featureDic, labelValidation)		
 #%% LOADING OF THE NON-LABELED DATASET:
     
     
@@ -131,11 +143,8 @@ predictedData = data2Predict.predict(parameters, labelValidation)
 
 
 
-#%%
-image_Young.compare(image_Old)
-
 #%% CREATION OF RANDOM DATASETS FOR TRAINING AND VALIDATION:
-
+"""
 # Ratio of the overall training dataset used for real training and used for 
 # validation:
 ratioTV = 1
@@ -185,6 +194,5 @@ zLimMax = 20
 image_Young = ia.ImageProperties(dataset[0]**1.)
 image_Old = ia.ImageProperties(dataset[1]**1.)
 
-
-
-
+image_Young.compare(image_Old)
+"""
