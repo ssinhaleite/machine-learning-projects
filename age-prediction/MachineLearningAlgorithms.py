@@ -13,6 +13,14 @@ from sklearn.svm import SVR
 from sklearn.svm import NuSVR
 from sklearn.svm import LinearSVR
 from sklearn import preprocessing
+from sklearn.linear_model import BayesianRidge, LinearRegression
+from sklearn.naive_bayes import GaussianNB
+
+#for image features
+from skimage.feature import greycomatrix, greycoprops
+from skimage import img_as_ubyte
+from skimage import exposure
+import matplotlib.pyplot as plt
 
 class Features:
     
@@ -159,22 +167,57 @@ class Features:
                 for iY in range(nGridY):
                     if nDimension == 2:
                         gridZone = image2D[iX*xlength : (iX+1)*xlength, \
-                                           iY*ylength : (iY+1)*ylength]                
+                                           iY*ylength : (iY+1)*ylength]      
+                        
+#                        print(gridZone.dtype)
+#                        plt.imshow(gridZone, cmap="gray")
+#                        plt.show()          
                         for iPolyOrder in range(npoly):
                             for iOp, Op in enumerate(typeOp):
-                                 if Op in ["average", "Average", "mean"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.mean(gridZone)**(iPolyOrder+1)
-                                 elif Op in ["max", "Max"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.amax(gridZone)**(iPolyOrder+1)
-                                 elif Op in ["min", "Min"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.amin(gridZone)**(iPolyOrder+1)
-                                 elif Op in ["variance", "Var", "Expectation", \
-                                             "expectation"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.var(gridZone)**(iPolyOrder+1)
+                                if Op in ["average", "Average", "mean"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.mean(gridZone)**(iPolyOrder+1)
+                                elif Op in ["max", "Max"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.amax(gridZone)**(iPolyOrder+1)
+                                elif Op in ["min", "Min"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.amin(gridZone)**(iPolyOrder+1)
+                                elif Op in ["variance", "Var", "Expectation", \
+                                            "expectation"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.var(gridZone)**(iPolyOrder+1)
+                                elif Op in ["covariance", "cov"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.cov(gridZone)**(iPolyOrder+1)
+                                elif Op in ["sum", "Sum"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.sum(gridZone)**(iPolyOrder+1)
+                                elif Op in ["energy"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'energy')[0, 0]
+                                elif Op in ["contrast"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'contrast')[0, 0]
+                                elif Op in ["dissimilarity"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'dissimilarity')[0, 0]
+                                elif Op in ["homogeneity"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'homogeneity')[0, 0]
+
                     elif nDimension == 3:
                         for iZ in range(nGridZ):
                             gridZone = datasetDic[iDataset][iX*xlength : (iX+1)*xlength, \
@@ -321,50 +364,29 @@ class Prediction:
             clf = linear_model.LinearRegression(copy_X=True, n_jobs=-1, \
                                                 normalize=False)
         elif classifier == "LASSO":
-            clf = linear_model.Lasso(alpha=0.1, copy_X=True, \
-                                     normalize=True, tol=0.0001)
+            clf = linear_model.Lasso(alpha=2000, copy_X=True, \
+                                     normalize=False, tol=0.1)
         elif classifier == "Ridge":
-            clf = linear_model.Ridge(alpha=1.0, copy_X=True, \
-                                     normalize=True, solver='auto', tol=0.001)
+            clf = linear_model.Ridge(alpha=2000, copy_X=True, \
+                                     normalize=False, solver='auto', tol=0.1)
         elif classifier == "RidgeCV": #ridge cross validation
-            clf = linear_model.RidgeCV(alphas=[0.1, 0.5, 1.0, 10.0], cv=None, \
+            clf = linear_model.RidgeCV(alphas=[0.1, 0.5, 1.0, 10.0], cv=10, \
                                        fit_intercept=True, normalize=True )
         elif classifier == "SVR-RBF": #support vector regression with Radial Basis Function kernel
             clf = SVR(kernel='rbf', C=1e3, gamma=0.1)
         elif classifier == "SVR-Linear": #support vector regression with linear kernel
-            print("SVR-linear")
             clf = LinearSVR( C=1, epsilon=0 )
-
+        elif classifier == "GaussianNB":
+            clf = GaussianNB()
             
-        label = label.reshape( label.size, 1 )
-        print("Feature shape: ", featureMatrix.shape)
-        print("Label shape: ", label.shape)
-        
-#        X_scaled = preprocessing.scale(featureMatrix)
-#        min_max_scaler = preprocessing.MinMaxScaler()
-#        X_train_minmax = min_max_scaler.fit_transform(featureMatrix)
-#        feature_min = np.min(featureMatrix, axis=0)
-#        feature_max = np.max(featureMatrix, axis=0)
-#        diff = feature_max - feature_min
-#        print(feature_max)
-#        print(feature_min)
-#        print(diff)
-#        featureMatrix_normalized = 1 - (((feature_max - featureMatrix)) / diff)
-
-#        label = np.ravel(label)
-#        np.linalg.norm
-#        print(featureMatrix.max(axis=0))
-#        featureMatrix_normalized = featureMatrix / featureMatrix.max(axis=0)
         clf.fit( featureMatrix, label )
         
         parameters =[]
-        if classifier != "SVR-RBF":
-            parameters = clf.coef_
-            parameters = parameters.reshape( clf.coef_.size, 1)
-            print("calculou coef")
-        
-        #print( mean_squared_error( y_test, ( regression.predict( x_test ) ) ) )
-        
+        #if classifier != "SVR-RBF" and classifier != "GaussianNB":
+        #    parameters = clf.coef_
+        #    parameters = parameters.reshape( clf.coef_.size, 1)
+        #    print("calculou coef")
+                
         return clf, parameters
         
             
@@ -373,9 +395,6 @@ class Prediction:
         # matrix and number of features computed:
         features = featureDic["validation"]
         nbSamples = features.shape[0]
-
-#        print(features.shape)
-#        print(parameters.shape)
         
         # Prediction of the model for the given dataset:
         if len(parameters) == 0:
@@ -384,7 +403,7 @@ class Prediction:
         else:
             predictedData = features.dot( parameters )
             
-        predictedData = np.rint(predictedData)
+        #predictedData = np.rint(predictedData)
         
         print("Predicted data: ", predictedData.shape)
         
@@ -406,9 +425,11 @@ class Prediction:
             x = np.linspace(1, nbSamples, nbSamples)
             print("number of samples: ", nbSamples)
             
-            import matplotlib.pyplot as plt
             import pylab
             plt.figure(100)
+            feature0 = features[:,0]
+            plt.plot(x, feature0, color="green", linewidth=1, \
+                     linestyle='--', marker='o')
             plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
                      linestyle='--', marker='o')
             plt.plot(x, labelSort, color="red", linewidth=1, \
