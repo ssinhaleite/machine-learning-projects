@@ -67,15 +67,15 @@ def featuresExtraction( ml, datasetDic):
             be interpreted as the polynomial order on which we want to fit 
             the given feature
     """
-    #featureDic = {"gridOperation": { "nGrid":(50,50), "npoly":1, "type2D":"center",   \
-    #                                 "axis":2, "typeOp":["mean"]} } 
-
-    featureDic = {#"gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["mean"]}, \
+    featureDic = {"gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["mean"]}, \
                   #"gridOperation": { "nGrid":(176,208), "npoly":1, "typeOp":["mean"]}, \
-                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["mean"]}, \
-                  #"gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["sum"]}, \
-#                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["cov"]}, \
-                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["var"]} \
+#                  "gridOperation": { "nGrid":(8,8,8), "npoly":2, "typeOp":["mean"]}, \
+#                  "gridOperation": { "nGrid":(8,8,8), "npoly":2, "typeOp":["sum"]}, \
+                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["cov"]}, \
+                  "gridOperation": { "nGrid":(5,5), "npoly":1, "typeOp":["energy"]}, \
+#                  "gridOperation": { "nGrid":(8,8), "npoly":1, "typeOp":["homogeneity"]}, \
+#                  "gridOperation": { "nGrid":(8,8), "npoly":1, "typeOp":["dissimilarity"]} \
+#                  "gridOperation": { "nGrid":(8,8), "npoly":1, "typeOp":["contrast"]} \
                  } 
 
     # Use of the function featureExtraction to extract the features selected in the		
@@ -124,7 +124,7 @@ data2Predict = ml.Prediction(featureMatrix, label)
 # training, the other for the validation:		
 # Ratio of the overall training dataset used for real training and used for 		
 # validation:		
-indexSplit, labelTraining, labelValidation = data2Predict.datasetSplit(ratioSplit = 0.8)		
+indexSplit, labelTraining, labelValidation = data2Predict.datasetSplit(ratioSplit = 0.7)		
 print("Training and validation datasets created")		
 
 #%% MODEL PARAMETER COMPUTATION:		
@@ -135,7 +135,7 @@ featureDic = data2Predict.featureSplit (**indexSplit)
 # function modelParameters:		
 #parameters = data2Predict.modelParameters(featureDic, shrinkageParameter = 0, \
 #                                          technique = "LS")		
-clf, parameters = data2Predict.buildClassifier(featureDic, labelTraining, classifier = "Ridge")		
+clf, parameters = data2Predict.buildClassifier(featureDic, labelTraining, classifier = "RidgeCV")		
 
 print("The parameters of the model has been computed")	
 	
@@ -166,11 +166,11 @@ featureDic["validation"] = featureMatrix
 newPrediction = unlabeledData.predict(parameters, featureDic, clf=clf)
 
 #%% WRITING ANSWER
-fileIO = open( 'data/submission-SVR-Linear-mean-Features3D-alpha1.csv','w' )
+fileIO = open( 'data/submissionRidgeCV_2410_0.8.csv','w' )
 fileIO.write( 'ID,Prediction\n' )
-answer = np.rint(newPrediction).astype(int)
+#answer = np.rint(newPrediction).astype(int)
 for i in range( len( newPrediction ) ):
-    fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
+    fileIO.write( str(i+1) + ',' + str(newPrediction[i]).strip('[]') + '\n' )
 fileIO.close()
 
 

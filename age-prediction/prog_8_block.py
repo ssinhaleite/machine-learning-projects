@@ -56,12 +56,12 @@ for i in range(n_train+n_test):
             for z in range(22):
                 img_chunk = img_data_float64[(8 * x):(8 * x + 8), (8 * y):(8 * y + 8), (8 * z):(8 * z + 8)]
                 img_chunk_ravel = img_chunk.ravel()
-                X[i, 26 * 22 * x + 22 * y + z]=np.mean(img_chunk_ravel)
+                X[i, 26 * 22 * x + 22 * y + z]=np.var(img_chunk_ravel)
 
 #lg.info('reading labels file')
 print('reading labels file')
 targets=[]
-targets_file=open('./targets.csv','r')
+targets_file=open('./data/targets.csv','r')
 for line in targets_file:
     targets.append(int(line))
 targets_file.close()
@@ -84,7 +84,7 @@ y = evaluate(A, b, X[n_train:(n_train+n_test), :])
 print('saving submission')
 
 y_=np.rint(y).astype(int)
-f=open('./submission_8_block.csv','w')
+f=open('./submission_8_block_2410.csv','w')
 f.write('ID,Prediction\n')
 for i in range(n_test):
     f.write(str(i+1)+','+str(y_[i])+'\n')
