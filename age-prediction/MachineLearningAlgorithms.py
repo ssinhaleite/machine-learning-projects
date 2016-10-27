@@ -19,8 +19,6 @@ from sklearn.naive_bayes import GaussianNB
 #for image features
 from skimage.feature import greycomatrix, greycoprops
 from skimage import img_as_ubyte
-from skimage import exposure
-import matplotlib.pyplot as plt
 
 class Features:
     
@@ -168,10 +166,6 @@ class Features:
                     if nDimension == 2:
                         gridZone = image2D[iX*xlength : (iX+1)*xlength, \
                                            iY*ylength : (iY+1)*ylength]      
-                        
-#                        print(gridZone.dtype)
-#                        plt.imshow(gridZone, cmap="gray")
-#                        plt.show()          
                         for iPolyOrder in range(npoly):
                             for iOp, Op in enumerate(typeOp):
                                 if Op in ["average", "Average", "mean"]:
@@ -425,6 +419,7 @@ class Prediction:
             x = np.linspace(1, nbSamples, nbSamples)
             print("number of samples: ", nbSamples)
             
+            import matplotlib.pyplot as plt
             import pylab
             plt.figure(100)
             feature0 = features[:,0]
