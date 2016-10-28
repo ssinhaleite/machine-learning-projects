@@ -1,7 +1,7 @@
 # Machine Learning Projects - 252-0535-00L - Fall 2016
 
-### Team: kareny
-###Members:
+## Team: kareny
+##Members:
 * Karen Yeressian Negarchi
 * Valentin Gallet
 * Vanessa Rodrigues Coelho Leite
@@ -16,6 +16,23 @@ Objective:
 
 About the code:
 ---------------
+
+###General:
+This code was created as an structure for the three projects in this course.
+Contains:
+- **imageAnalysis.py**: contains definition of MRI as a image. Used for plot the MRI and to compare two images
+Example of usage:
+
+```
+image_Young = ia.ImageProperties(dataset[0]**1.)
+image_Old = ia.ImageProperties(dataset[1]**1.)
+
+image_Young.compare(image_Old)
+
+``` 
+- **MachineLearningAlgorithms.py**
+- **scriptest.py**
+
 
 ###Dependencies:
 
