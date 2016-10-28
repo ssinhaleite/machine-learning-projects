@@ -3,6 +3,7 @@
 Created on Fri Oct 21 09:06:58 2016
 
 @author: valentin
+@author: vleite
 """
 
 import numpy as np

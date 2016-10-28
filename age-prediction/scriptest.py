@@ -3,6 +3,8 @@
 Created on Mon Oct 10 10:23:32 2016
 
 @author: valentin
+@author: vleite
+@author: kareny
 """
 #%% IMPORTATION oF THE NECESSARY LIBRARIES:
 import numpy as np
