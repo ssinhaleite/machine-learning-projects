@@ -151,7 +151,7 @@ print("After cross-validation, we obtain a score of {}".format(MSECV))
 #%% COMPUTATION OF THE MODEL PARAMETERS ON THE WHOLE LABELED DATASET:
 print(featureMatrix.shape)
 _, modelParameters = data2Predict.buildClassifier(featureMatrix, \
-             crossValid = False, labelTraining=label, classifier = "RidgeCV")
+                                                  labelTraining=label, classifier = "RidgeCV")
 
 # Prediction of the data using the model parameters:
 _, MSESelf = data2Predict.predict(modelParameters, featureMatrix,\
@@ -173,6 +173,7 @@ ml = importlib.reload(ml)
 #extracting features from the dataset
 featureMatrixTest = featuresExtraction(datasetTestDic, featureDic)
 
+print("Features on test set extracted successfully")
 #%% PREDICTION FOR THE NON-LABELED DATASET:
 
 # We create an object of the class Prediction from the trainDataset dictionary:        
@@ -205,3 +206,4 @@ for i in range( len( testPrediction ) ):
     fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
 fileIO.close()
 
+print("submission.csv generated successfully")

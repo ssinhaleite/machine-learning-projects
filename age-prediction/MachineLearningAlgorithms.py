@@ -546,10 +546,9 @@ class Prediction:
         return parameters
         
         
-    def buildClassifier( self, featureTraining, labelTraining=[], classifier = "LASSO", crossValid = False):
+    def buildClassifier( self, featureTraining, labelTraining=[], classifier = "LASSO"):
         
-        label = labelTraining    
-        #featureTraining
+        label = labelTraining
         #parameters of classifiers:
         #copy_X: to copy the input data and do not overwrite
         #n_jobs: number of jobs used for computation. -1 means all CPUs will be used
@@ -571,19 +570,15 @@ class Prediction:
             
         #label = np.concatenate((self.label,np.zeros(self.nFeatures)))
         label = label.reshape( label.size, 1 )
-#        if crossValid == False:
-#            print("Feature shape: ", featureTraining.shape)
-#            print("Label shape: ", label.shape)
+#       print("Feature shape: ", featureTraining.shape)
+#       print("Label shape: ", label.shape)
 
         clf.fit( featureTraining, label ) 
-        
         
         parameters = clf.coef_
         parameters = parameters.reshape(clf.coef_.size, 1)
         parameters = np.append( clf.intercept_, parameters)
-        
-        #print( mean_squared_error( y_test, ( regression.predict( x_test ) ) ) )
-        
+                
         return clf, parameters
         
             
@@ -615,11 +610,10 @@ class Prediction:
             # X-axis:
             x = np.linspace(1, nbSamples, nbSamples)
             if crossValid == False:
-                print("The achieved score is: " + str(( round(MSE) )))
+                #print("The achieved score is: " + str(( round(MSE) )))
                 #print( " MSE: ", mean_squared_error( labelValidation, predictedData ) )
-                print("number of samples: ", nbSamples)
-            
-            
+                #print("number of samples: ", nbSamples)
+
                 #import pylab
                 plt.figure(100)
                 plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
@@ -692,7 +686,7 @@ class Prediction:
             
             # We compute the model parameters
             _, parameters = self.buildClassifier(featuresMatrix[indexTrain, :], \
-                            crossValid = True, labelTraining=label[indexTrain], classifier = "RidgeCV")
+                            labelTraining=label[indexTrain], classifier = "RidgeCV")
            
             # We predict the data with the computed parameters
             predictedData, MSEArray[i] = self.predict(parameters, \
