@@ -3,38 +3,52 @@
 Created on Fri Oct 21 09:06:58 2016
 
 @author: valentin
-@author: vleite
 """
-
+# Import the needed libraries:
 import numpy as np
 import sys
 import time
 import matplotlib.pyplot as plt
 
-#for regression models
 from sklearn import linear_model
-from sklearn.metrics import mean_squared_error
-from sklearn.svm import LinearSVR
-#for image features
 from skimage.feature import greycomatrix, greycoprops
 from skimage import img_as_ubyte
 
-#from sklearn.svm import SVR
-#from sklearn.svm import NuSVR
-
-#from sklearn import preprocessing
-#from sklearn.linear_model import BayesianRidge, LinearRegression
-#from sklearn.naive_bayes import GaussianNB
-
-
 class Features:
+    """ The objects of this class are used to extract the features from a
+    3D matrix in order to apply some machine learning alorithm
+    
+    CLASS ATTRIBUTES:
+        dataset -- dictionary, contain the dataset whose the keys are the 
+        indices of the 3D MRI images of the dataset and the values are a 3D  
+        np.array containing these 3D images
+        ndata -- integer, number of 3D images in the dataset
+        sizeX -- integer, number of voxels along the 1st dimension of the 3D 
+        np.array
+        sizeY -- integer, number of voxels along the 2nd dimension of the 3D 
+        np.array
+        sizeZ -- integer, number of voxels along the 3rd dimension of the 3D 
+        np.array
+        nVoxels -- integer, number of voxels contained in the 3D images
+        X0 -- integer, central voxel along the 1st dimension of the 3D 
+        np.array
+        Y0 -- integer, central voxel along the 1st dimension of the 3D 
+        np.array
+        Z0 -- integer, central voxel along the 1st dimension of the 3D 
+        np.array
+    """
     
     def __init__(self, datasetDic):
+        """
+        Constructuctor of the class Features
+        """
+        
+        # Dictionary 
         self.dataset = datasetDic
         self.nData =  len( self.dataset ) 
         
-        self.size3D = self.dataset[0].shape
-        (self.sizeX, self.sizeY, self.sizeZ) = self.size3D
+        # number of voxels along the 1st dimension of the 3D np.array
+        (self.sizeX, self.sizeY, self.sizeZ) = self.dataset[0].shape
         
         # Number of voxels:
         self.nVoxels = self.sizeX * self.sizeY * self.sizeZ
@@ -49,7 +63,7 @@ class Features:
         """
         DEFINITION:
         This function computes the feature matrix for a dataseet. This can be 
-        used either to the determine the parameter matrix of our model if we
+        used either to determine the parameter matrix of our model if we
         have labeled data (= training dataset) or to realize prediction (= 
         validation dataset or test dataset).
         
@@ -60,8 +74,6 @@ class Features:
             to extract the features we wish. 
             2) The value represents the parameters of the used function knowing
             that:
-                - the dataset should not be precised even if it is a parameter
-                of the function.
                 - the parameters can be either a dictionary: {"input1": value1,
                 ..., "inputN": valueN} or a number. If it is a number it will 
                 be interpreted as the polynomial order on which we want to fit 
@@ -69,7 +81,7 @@ class Features:
         """
         # Initialisation of the featureMatrix which will contain the values  \
         # of all the features computed for each element of the dataset:
-        #featureMatrix = np.ones([self.nData,1]) # This corresponds to the bias
+        # featureMatrix = np.ones([self.nData,1]) # This corresponds to the bias
         it = 0
         
         # Database dictionary containing the functions potentially used for 
@@ -77,8 +89,8 @@ class Features:
         functionDic = {} # should be fulfill as soon as we add a new function
                          # for feature extraction !!!
         functionDic["gridOperation"] = self.gridOperation
-        functionDic["threshold"] = self.threshold   
-                    
+        functionDic["threshold"] = self.threshold            
+        
         # In the following loop, we call the functions allowing to compute the \
         # features chosen by the users in the dictionary featureType:
         for k,v in featureType.items():
@@ -88,46 +100,71 @@ class Features:
                 if v < 1:
                     v = 1
                 localFeatures = functionDic[k](npoly=v)	
+             
             if it == 0:
                 featureMatrix = localFeatures
                 it += 1
             else:
                 featureMatrix = np.concatenate((featureMatrix, localFeatures), axis=1)
-                            
+                
+            
             return featureMatrix
             
 ###############################################################################          
             
-    def gridOperation(self, typeOp=["mean"], nGrid=(10,10), npoly=1, type2D="center", axis=2):
+    def gridOperation(self, typeOp=["mean"], nGrid=(10,10,"center"), npoly=1):
         """
+        To divide the 3D MRI image into smaller volumes and then applied some
+        mathematical operation on these volumes (mean, variance, max...)
+        
+        INPUTS:
+            typeOp -- list of strings, type of operations which will be applied 
+            on the smaller volume
+            nGrid -- tuple of 2 or 3 integers, number of space division we want
+            along the two or three dimensions.
+            npoly -- integer, polynomial order of the features. 
+            
+        OUTPUTS:
+            features -- 2D np.array of float numbers, the feature matrix with
+            the features computed for each 3D images
+            
+        
         Example of use:
         2D) 
-        featureDic = {"gridOperation": { "nGrid":(15,15), "npoly":2, "axis":0, \
-            "type2D":"center", "typeOp":["mean", "var"]} } 
+        featureDic = {"gridOperation": { "nGrid":(15,15,"center"), "npoly":2, \
+            "typeOp":["mean", "var"]} } 
         
         3D) 
-        featureDic = {"gridOperation": { "nGrid":(15,15,15), "npoly":2, "axis":0, \
+        featureDic = {"gridOperation": { "nGrid":(15,15,15), "npoly":2, \
             "typeOp":["mean", "var"]} } 
-        """   
+        """
+        
         # Dictionary containing the dataset:
         datasetDic = self.dataset
         
         # Number of operations required by the user:
         nOp = len(typeOp)
-
         
+        # Polynomial order of the computed features:
         if npoly < 1:
             npoly = 1
-            
-        if len(nGrid) < 3:
+       
+        # In this loop, we determine the number of dimension along sith the 
+        # space will be divided
+        if len(nGrid) == 2:
             nDimension = 2
+            type2D = ["center"]
         else:
             nDimension = 3
-
+            for i in range(2):
+                if isinstance(nGrid[i], str):
+                    nDimension = 2
+                    axis = i
+                    type2D = [nGrid[i]]                                  
+            
         # Number of subdivisions of the grid along each dimension: 
         nGridX = nGrid[0]
         nGridY = nGrid[1]
-                    
         if nDimension == 3:
             nGridZ = nGrid[2]
             
@@ -139,10 +176,11 @@ class Features:
         
         xGrid = 0
         yGrid = 0
+        
         for i in range(nGridX):
-           
             xGrid += int(round((self.sizeX-xGrid)/(nGridX-i)))
             xlength.append(xGrid)
+            
         for i in range(nGridY):
             yGrid += int(round((self.sizeY-yGrid)/(nGridY-i)))
             ylength.append(yGrid)
@@ -202,6 +240,7 @@ class Features:
                         image2D = datasetDic[iDataset][:,type2D,:]
                     elif axis == 2:
                         image2D = datasetDic[iDataset][:,:,type2D]
+            
             for iX in range(nGridX):
                 for iY in range(nGridY):
                     if nDimension == 2:
@@ -300,7 +339,8 @@ class Features:
                                         glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
                                         featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                         greycoprops(glcm, 'homogeneity')[0, 0]
-                    
+             
+            # Status bar:       
             status = (100 * (iDataset+1) / (self.nData))
             if iDataset == 0:
                 endTime = time.time()
@@ -327,12 +367,7 @@ class Features:
 
     def threshold(self, nLevel=10, thresholdType = "Energy", axis=-1):
         """
-        Example of use:
-        featureDic = 
-        {"threshold": { "nLevel":10, "thresholdType": "Energy", "axis":-1 } 
-        
-        featureDic = 
-        {"threshold": { "nLevel":10, "thresholdType": "Energy", "axis":1 }
+        THIS DOES NOT WORK PROPERLY. IT SHOULD NOT BE USED !!
         """
         # Dictionary containing the dataset:
         datasetDic = self.dataset
@@ -450,7 +485,6 @@ class Features:
                             belowThreshold += thresholdVector[iImage, i]
                         features[iDataset,:] = thresholdVector.flatten()
 
-        print(features.shape)
         return features
 
 
@@ -459,58 +493,42 @@ class Features:
 ###############################################################################      
             
 class Prediction:
+    """ The objects of this class are used to determine the parameters of our
+    model from the training dataset using a cross-validation stage. It can also
+    be used to predict the labels of the test set once the model parameters
+    determined
     
+    CLASS ATTRIBUTES:
+        features -- 2D np.array of float numbers, the feature matrix with
+        the features computed for each 3D images
+        label -- list of integers, the labels of the training dataset
+        nSamples -- integer, number of 3D MRI images in the dataset
+        nFeatures -- integer, number of computed features
+        
+    """
     def __init__(self, featuresMatrix, label=[]):
+        """
+        Constructuctor of the class Prediction
+        """
+        
+        # 2D feature matrix extracted from the original 3D images:
         self.features = featuresMatrix
+        
+        # Labels of the training dataset:
         self.label = label
+        
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
         (self.nSamples, self.nFeatures) = featuresMatrix.shape
-        
-        
-    def datasetSplit(self, ratioSplit = 0.8):		
-        # Number of samples in the entire dataset:		
-        nbSamples = self.nSamples		
-    		
-        # Number of images used for training:		
-        nTrain = round(ratioSplit * nbSamples)		
-    		
-        # Number of images used for validation:		
-        # nValid = nbSamples - nTrain		
-    		
-        shuffleIndex = np.arange(nbSamples)		
-        np.random.shuffle(shuffleIndex)		
-    		
-        # Indices of the training and validation datasets:		
-        trainIndex = shuffleIndex[:nTrain-1]		
-        validIndex = shuffleIndex[nTrain:]		
-        indexSplit = {"training":trainIndex, "validation":validIndex}		
-    		
-#       print ("Training and validation dataset indexes created. Average age:\n\		
-#       Training dataset: {} y.o\nvalidation dataset: {} y.o".format(int(round(labelTrain.mean())), \		
-#       int(round(labelValid.mean()))))	
-
-        labelTraining=[]
-        labelValidation=[]
-        if len(self.label) != 0:	
-            labelTraining = self.label[indexSplit["training"]]
-            labelValidation = self.label[indexSplit["validation"]]		
-    		
-        return indexSplit, labelTraining, labelValidation		
-    		
-        		
-    def featureSplit (self, ratioSplit=0.8, **indexSplit):		
-        if len(indexSplit) == 0:		
-            indexSplit = self.datasetSplit(int(ratioSplit)	)	
-        		
-        # Labels of the training and validation datasets:		
-        featureDic = {}		
-        featureDic["training"] = self.features[indexSplit["training"], :]		
-        featureDic["validation"] = self.features[indexSplit["validation"], :]		
-        return featureDic
-        
+                
     
     def modelParameters(self, featureDic=[], shrinkageParameter = 0, technique = "LS"):
+        """
+        DEPRECATED: you should use buildclassifier instead. The simple ridge 
+        regression gives exactly the same results as the one in the 
+        buildclassifier function but slower. This is why we recommand to use
+        buildclassifier
+        """
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
         nbSamples = self.nSamples
@@ -544,91 +562,100 @@ class Prediction:
         return parameters
         
         
-    def buildClassifier( self, featureTraining, labelTraining=[], classifier = "LASSO"):
+    def buildClassifier( self, featureTraining, label, method = "LASSO"):
+        """ To compute the model parameters given the feature matrix and the 
+        labels of a training dataset
         
-        label = labelTraining
+        INPUTS: 
+            featureTraining -- 2D np.array, feature matrix containung the 
+            features extracting from the dataset
+            method -- string, linear method used for determining the parameters
+            of the model
+            
+        OUTPUTS:
+            parameters: 1D np.array, the parameters of the model
+        """
+        
+        # Labels of the dataset:
+        # label = self.label	
+        
         #parameters of classifiers:
+        #alpha: regularizer (or shrinkage) parameter
         #copy_X: to copy the input data and do not overwrite
         #n_jobs: number of jobs used for computation. -1 means all CPUs will be used
         #cv: method for cross-validation. None means use Leave-one-out
         
-        if classifier == "Linear regression":
+        if method == "Linear regression":
             clf = linear_model.LinearRegression(copy_X=True, n_jobs=-1, \
                                                 normalize=True)
-        elif classifier == "LASSO":
+        elif method == "LASSO":
             clf = linear_model.Lasso(alpha=0.1, copy_X=True, \
                                      normalize=True, tol=0.0001)
-        elif classifier == "Ridge":
+        elif method == "Ridge":
             clf = linear_model.Ridge(alpha=0.5, copy_X=True, \
                                      normalize=True, solver='lsqr', tol=0.001)
-        elif classifier == "RidgeCV": #ridge cross validation
-            clf = linear_model.RidgeCV( alphas=[0.0, 0.01, 10.0], cv=None, fit_intercept=True, normalize=True )
-        elif classifier == "SVR-Linear": #support vector regression with linear kernel
-            clf = LinearSVR( C=1, epsilon=0 )
-            
-        #label = np.concatenate((self.label,np.zeros(self.nFeatures)))
+        elif method == "RidgeCV": #ridge cross validation
+            clf = linear_model.RidgeCV( alphas=[0.0, 0.1, 10.0], cv=None, \
+                                       fit_intercept=True, normalize=True )
+        
         label = label.reshape( label.size, 1 )
-#       print("Feature shape: ", featureTraining.shape)
-#       print("Label shape: ", label.shape)
-
+        
+        # Use the function fit from the sklearn module
         clf.fit( featureTraining, label ) 
         
+        # Use the function coef_ from the sklearn module to compute the 
+        # parameters of our model:
         parameters = clf.coef_
         parameters = parameters.reshape(clf.coef_.size, 1)
-        parameters = np.append( clf.intercept_, parameters)
-                
-        return clf, parameters
+        parameters = np.append( clf.intercept_, parameters) # to add the bias
+        
+        return parameters
         
             
-    def predict(self, parameters, features, crossValid = False, labelValidation=[]):
-        # Number of elements in the dataset used for computing the features 
-        # matrix and number of features computed:
+    def predict(self, parameters, features, labelValidation=[]):
+        """ To compute the model parameters given the feature matrix and the 
+        labels of a training dataset
         
+        INPUTS:
+            parameters: 1D np.array, the parameters of the model
+            features -- 2D np.array, feature matrix containung the 
+            features extracting from the dataset
+            labelValidation -- 1D np.array, the labels used for validation
+            
+        OUTPUTS:
+            predictedData: 1D np.array, the predicted labels
+        """
+        # Number of 3D MRI images in the dataset:
         nbSamples = features.shape[0]
 
-        #print(features.shape)
-        #print(parameters.shape)
+        # The first column of the feature matrix should be the bias:
         bias = np.ones([nbSamples,1])
         features = np.concatenate((bias, features), axis=1)
-        # Prediction of the model for the given dataset:
-        predictedData = features.dot( parameters )        
         
-        if len(labelValidation) != 0:
-            
-            # Computation of the mean squared error of the predicted data:
+        # Prediction of the model for the given dataset:
+        predictedData = features.dot( parameters )
+        
+        # Computation of the mean squared error of the predicted data:
+        if len(labelValidation) > 0:
             MSE = (np.mean((predictedData - labelValidation)**2)) 
-            
-            
-            # we sort the label (ascending order) and the predicted data:
-            indexSort = np.argsort(labelValidation)
-            labelSort = np.array(labelValidation[indexSort])
-            predictedDataSort = np.array(predictedData[indexSort])
-            #predictionsR = np.array(predictions[indexSort])
-            
-            # X-axis:
-            x = np.linspace(1, nbSamples, nbSamples)
-            if crossValid == False:
-                #print("The achieved score is: " + str(( round(MSE) )))
-                #print( " MSE: ", mean_squared_error( labelValidation, predictedData ) )
-                #print("number of samples: ", nbSamples)
-
-                #import pylab
-                plt.figure(100)
-                plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
-                         linestyle='--', marker='o')
-                plt.plot(x, labelSort, color="red", linewidth=1, \
-                         linestyle='--', marker='o')
-               
-                plt.title("Validation of the model")
-                plt.xlabel("Patient number")
-                plt.ylabel("Age")
             return predictedData, MSE
-            #pylab.show()
             
         return predictedData
         
                     
     def crossValidation(self, nFold=10, typeCV="random"):
+        """ To compute the model parameters through cros-validation and 
+        estimate the choice of the features by computing the mean-squared error
+        
+        INPUTS:
+            nFold: integer, number of folds (or buckets) used for 
+            cross-validation
+            typeCV -- string, type of cross-validation
+            
+        OUTPUTS:
+            MSE: float, mean-squared error computed after the cross-validation
+        """
+        
         featuresMatrix = self.features 
         label = self.label
         
@@ -683,12 +710,12 @@ class Prediction:
             indexTrain = np.delete(indices, indexValid)
             
             # We compute the model parameters
-            _, parameters = self.buildClassifier(featuresMatrix[indexTrain, :], \
-                            labelTraining=label[indexTrain], classifier = "RidgeCV")
-           
+            parameters = self.buildClassifier(featuresMatrix[indexTrain, :], \
+                            label[indexTrain], method = "RidgeCV")
+            
             # We predict the data with the computed parameters
             predictedData, MSEArray[i] = self.predict(parameters, \
-                          featuresMatrix[indexValid, :], crossValid = True, labelValidation=label[indexValid])
+                          featuresMatrix[indexValid, :], labelValidation=label[indexValid])
   
             # We save the predicted data in the appropriate matrix:
             predictions[i*samplePerFoldTrain : (i+1)*samplePerFoldTrain] = predictedData[:samplePerFoldTrain]
@@ -720,5 +747,4 @@ class Prediction:
         plt.xlabel("Patient number")
         plt.ylabel("Age")
             
-        return MSE
-            
+        return MSE 
