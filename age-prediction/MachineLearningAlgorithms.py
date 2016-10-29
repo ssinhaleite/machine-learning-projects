@@ -7,19 +7,25 @@ Created on Fri Oct 21 09:06:58 2016
 """
 
 import numpy as np
+import sys
+import time
+import matplotlib.pyplot as plt
 
+#for regression models
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
-from sklearn.svm import SVR
-from sklearn.svm import NuSVR
 from sklearn.svm import LinearSVR
-from sklearn import preprocessing
-from sklearn.linear_model import BayesianRidge, LinearRegression
-from sklearn.naive_bayes import GaussianNB
-
 #for image features
 from skimage.feature import greycomatrix, greycoprops
 from skimage import img_as_ubyte
+
+#from sklearn.svm import SVR
+#from sklearn.svm import NuSVR
+
+#from sklearn import preprocessing
+#from sklearn.linear_model import BayesianRidge, LinearRegression
+#from sklearn.naive_bayes import GaussianNB
+
 
 class Features:
     
@@ -29,6 +35,9 @@ class Features:
         
         self.size3D = self.dataset[0].shape
         (self.sizeX, self.sizeY, self.sizeZ) = self.size3D
+        
+        # Number of voxels:
+        self.nVoxels = self.sizeX * self.sizeY * self.sizeZ
         
         # Central positions along x, y, z:
         self.X0 = int(float(self.sizeX)/2)
@@ -60,13 +69,15 @@ class Features:
         """
         # Initialisation of the featureMatrix which will contain the values  \
         # of all the features computed for each element of the dataset:
-        featureMatrix = np.ones([self.nData,1]) # This corresponds to the bias
+        #featureMatrix = np.ones([self.nData,1]) # This corresponds to the bias
+        it = 0
         
         # Database dictionary containing the functions potentially used for 
         # features extraction:
         functionDic = {} # should be fulfill as soon as we add a new function
                          # for feature extraction !!!
         functionDic["gridOperation"] = self.gridOperation
+        functionDic["threshold"] = self.threshold   
                     
         # In the following loop, we call the functions allowing to compute the \
         # features chosen by the users in the dictionary featureType:
@@ -77,17 +88,33 @@ class Features:
                 if v < 1:
                     v = 1
                 localFeatures = functionDic[k](npoly=v)	
-                
-            featureMatrix = np.concatenate((featureMatrix, localFeatures), axis=1)
-            
+            if it == 0:
+                featureMatrix = localFeatures
+                it += 1
+            else:
+                featureMatrix = np.concatenate((featureMatrix, localFeatures), axis=1)
+                            
             return featureMatrix
             
 ###############################################################################          
             
     def gridOperation(self, typeOp=["mean"], nGrid=(10,10), npoly=1, type2D="center", axis=2):
-   
+        """
+        Example of use:
+        2D) 
+        featureDic = {"gridOperation": { "nGrid":(15,15), "npoly":2, "axis":0, \
+            "type2D":"center", "typeOp":["mean", "var"]} } 
+        
+        3D) 
+        featureDic = {"gridOperation": { "nGrid":(15,15,15), "npoly":2, "axis":0, \
+            "typeOp":["mean", "var"]} } 
+        """   
         # Dictionary containing the dataset:
         datasetDic = self.dataset
+        
+        # Number of operations required by the user:
+        nOp = len(typeOp)
+
         
         if npoly < 1:
             npoly = 1
@@ -96,22 +123,37 @@ class Features:
             nDimension = 2
         else:
             nDimension = 3
-            
-        # Number of operations required by the user:
-        nOp = len(typeOp)
-        
-        # Length (in points) of the grid along the different dimension:     
-        xlength = int(round(self.sizeX*nGrid[0]/100))
-        ylength = int(round(self.sizeY*nGrid[1]/100))
+
+        # Number of subdivisions of the grid along each dimension: 
+        nGridX = nGrid[0]
+        nGridY = nGrid[1]
                     
         if nDimension == 3:
-            zlength = int(round(self.sizeZ*nGrid[2]/100))
+            nGridZ = nGrid[2]
+            
+        # Length (in points) of the grid along the different dimension:
+        xlength = []
+        ylength  =[]
+        xlength.append(0)
+        ylength.append(0)
         
-        # Number of subdivisions of the grid along each dimension: 
-        nGridX = int(np.ceil(self.sizeX / xlength))
-        nGridY = int(np.ceil(self.sizeY / ylength))
+        xGrid = 0
+        yGrid = 0
+        for i in range(nGridX):
+           
+            xGrid += int(round((self.sizeX-xGrid)/(nGridX-i)))
+            xlength.append(xGrid)
+        for i in range(nGridY):
+            yGrid += int(round((self.sizeY-yGrid)/(nGridY-i)))
+            ylength.append(yGrid)
+        
         if nDimension == 3:
-            nGridZ = int(np.ceil(self.sizeZ / zlength))
+            zlength =[]
+            zlength.append(0)
+            zGrid = 0
+            for i in range(nGridZ):
+                zGrid += int(round((self.sizeZ-zGrid)/(nGridZ-i)))
+                zlength.append(zGrid)
 
         # Creation of the featureMatrix containing the features in a 4D/5D matrix:
         if nDimension == 2:
@@ -120,18 +162,17 @@ class Features:
         elif nDimension == 3:
             featureMatrix = np.empty([nGridX, nGridY, nGridZ, nOp, npoly])
             features = np.empty([self.nData, nGridX*nGridY*nGridZ*nOp*npoly])
-
-        if nGrid[0]==176:
-            print(xlength)
-            print(ylength)
-            print(zlength)
-            print(nGridX)
-            print(nGridY)
-            print(nGridZ)
-            print(features.shape)
-
-            
+        
+        # Status bar:
+        # Counts of the number of steps already processed:
+        CalculDone = 1
+        statusBar =""
+        sampleStatus = 1 # in %
+        nbSampleStatus = int(100 / sampleStatus)
+        
         for iDataset in range(self.nData):
+            if iDataset == 0:
+                startTime = time.time()
             # Case of a 2D grid:
             if nDimension == 2:
                 # The grid operation is repeated for the 2D image given by the
@@ -161,102 +202,261 @@ class Features:
                         image2D = datasetDic[iDataset][:,type2D,:]
                     elif axis == 2:
                         image2D = datasetDic[iDataset][:,:,type2D]
-                
             for iX in range(nGridX):
                 for iY in range(nGridY):
                     if nDimension == 2:
-                        gridZone = image2D[iX*xlength : (iX+1)*xlength, \
-                                           iY*ylength : (iY+1)*ylength]      
+                        gridZone = image2D[xlength[iX] : xlength[iX+1], \
+                                           ylength[iY] : ylength[iY+1]]                
                         for iPolyOrder in range(npoly):
                             for iOp, Op in enumerate(typeOp):
-                                if Op in ["average", "Average", "mean"]:
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    np.mean(gridZone)**(iPolyOrder+1)
-                                elif Op in ["max", "Max"]:
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    np.amax(gridZone)**(iPolyOrder+1)
-                                elif Op in ["min", "Min"]:
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    np.amin(gridZone)**(iPolyOrder+1)
-                                elif Op in ["variance", "Var", "Expectation", \
-                                            "expectation"]:
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    np.var(gridZone)**(iPolyOrder+1)
-                                elif Op in ["covariance", "cov"]:
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    np.cov(gridZone)**(iPolyOrder+1)
-                                elif Op in ["sum", "Sum"]:
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    np.sum(gridZone)**(iPolyOrder+1)
-                                elif Op in ["energy"]:
-                                    #calcula a GLCM
-                                    gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    greycoprops(glcm, 'energy')[0, 0]
-                                elif Op in ["contrast"]:
-                                    #calcula a GLCM
-                                    gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    greycoprops(glcm, 'contrast')[0, 0]
-                                elif Op in ["dissimilarity"]:
-                                    #calcula a GLCM
-                                    gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    greycoprops(glcm, 'dissimilarity')[0, 0]
-                                elif Op in ["homogeneity"]:
-                                    #calcula a GLCM
-                                    gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                    greycoprops(glcm, 'homogeneity')[0, 0]
-
+                                 if Op in ["average", "Average", "mean"]:
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                     np.mean(gridZone)**(iPolyOrder+1)
+                                 elif Op in ["max", "Max"]:
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                     np.amax(gridZone)**(iPolyOrder+1)
+                                 elif Op in ["min", "Min"]:
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                     np.amin(gridZone)**(iPolyOrder+1)
+                                 elif Op in ["variance", "Var", "Expectation", \
+                                             "expectation"]:
+                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                     np.var(gridZone)**(iPolyOrder+1)
                     elif nDimension == 3:
                         for iZ in range(nGridZ):
-                            gridZone = datasetDic[iDataset][iX*xlength : (iX+1)*xlength, \
-                                               iY*ylength : (iY+1)*ylength, \
-                                               iZ*zlength : (iZ+1)*zlength]                
+                            gridZone = datasetDic[iDataset][ \
+                                            xlength[iX] : xlength[iX+1], \
+                                            ylength[iY] : ylength[iY+1], \
+                                            zlength[iZ] : zlength[iZ+1]] 
+               
                             for iPolyOrder in range(npoly):
                                 for iOp, Op in enumerate(typeOp):
                                     if Op in ["average", "Average", "mean"]:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.mean(gridZone)**(iPolyOrder+1)
-                                        if np.isnan(featureMatrix[iX, iY, iZ, iOp, \
-                                                      iPolyOrder]) or \
-                                           np.isinf(featureMatrix[iX, iY, iZ, iOp, \
-                                                      iPolyOrder]): 
-                                               featureMatrix[iX, iY, iZ, iOp, \
-                                                      iPolyOrder] = 0.0
+                                        
                                     elif Op in ["max", "Max"]:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.amax(gridZone)**(iPolyOrder+1)
+                                        
                                     elif Op in ["min", "Min"]:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.amin(gridZone)**(iPolyOrder+1)
+                                        
+                                    elif Op in ["contrast3D", "Michelson"]:
+                                        minGrid = np.amin(gridZone)
+                                        maxGrid = np.amax(gridZone)
+                                        if minGrid == 0 and minGrid == 0:
+                                            michelsonContrast = 0
+                                        else:
+                                            michelsonContrast = \
+                                            (maxGrid-minGrid)/(maxGrid+minGrid)
+                                        
+                                        featureMatrix[iX, iY, iZ, iOp, \
+                                                      iPolyOrder] = \
+                                        michelsonContrast**(iPolyOrder+1)
+                                        
                                     elif Op in ["variance", "var", \
                                                 "Expectation", "expectation"]:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.var(gridZone)**(iPolyOrder+1)
+                                        
                                     elif Op in ["covariance", "cov"]:
-                                        featureMatrix[iX, iY, iZ, iOp, \
-                                                      iPolyOrder] = \
+                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                         np.cov(gridZone)**(iPolyOrder+1)
+                                    
                                     elif Op in ["sum", "Sum"]:
-                                        featureMatrix[iX, iY, iZ, iOp, \
-                                                      iPolyOrder] = \
+                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                         np.sum(gridZone)**(iPolyOrder+1)
-                                       
+                                        
+                                    elif Op in ["energy"]:
+                                        #calcula a GLCM
+                                        gridZone = img_as_ubyte(gridZone)
+                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                        greycoprops(glcm, 'energy')[0, 0]
+
+                                    elif Op in ["contrast"]:
+                                        #calcula a GLCM
+                                        gridZone = img_as_ubyte(gridZone)
+                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                        greycoprops(glcm, 'contrast')[0, 0]
+
+                                    elif Op in ["dissimilarity"]:
+                                        #calcula a GLCM
+                                        gridZone = img_as_ubyte(gridZone)
+                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                        greycoprops(glcm, 'dissimilarity')[0, 0]
+
+                                    elif Op in ["homogeneity"]:
+                                        #calcula a GLCM
+                                        gridZone = img_as_ubyte(gridZone)
+                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                        greycoprops(glcm, 'homogeneity')[0, 0]
+                    
+            status = (100 * (iDataset+1) / (self.nData))
+            if iDataset == 0:
+                endTime = time.time()
+                time1Iteration = endTime - startTime
+                totalTime = 100 * time1Iteration / status
+                
+            if status > CalculDone * sampleStatus:
+                    CalculDone += 1
+                    statusBar += "="
+                    remainingTime = int(round(totalTime * (1 - CalculDone*sampleStatus/100))) 
+                    #print("\r" + statusBar)
+                    sys.stdout.write("\r" + "=" * CalculDone + \
+                         " " * (nbSampleStatus-CalculDone) + str(remainingTime)+"s" )
+                    sys.stdout.flush() 
+             
+            
             # We flatten the 4D/5D featureMatrix:
             features[iDataset,:] = featureMatrix.flatten()
-            
+        
+         
         return features
-                            
+
+###############################################################################        
+
+    def threshold(self, nLevel=10, thresholdType = "Energy", axis=-1):
+        """
+        Example of use:
+        featureDic = 
+        {"threshold": { "nLevel":10, "thresholdType": "Energy", "axis":-1 } 
+        
+        featureDic = 
+        {"threshold": { "nLevel":10, "thresholdType": "Energy", "axis":1 }
+        """
+        # Dictionary containing the dataset:
+        datasetDic = self.dataset
+        
+        # Status bar:
+        # Counts of the number of steps already processed:
+        CalculDone = 1
+        statusBar =""
+        sampleStatus = 1 # in %
+        nbSampleStatus = int(100 / sampleStatus)
+        
+        for iDataset in range(self.nData):
+            if iDataset == 0:
+                startTime = time.time()
+            if thresholdType ==  "Energy":
+                # 3D image:
+                image3D = datasetDic[iDataset]
+                
+                # Computation of the total energy:
+                energy = np.sum(image3D)
+                
+                # Mean energy:
+                energyMean = energy / self.nVoxels
+                
+                # Factor for the upper threshold level:
+                factorEnergy = 5
+                maxLevel = factorEnergy * energyMean
+                
+                # Threshold vector:
+                levelVector = (np.arange(nLevel)+1) * maxLevel / nLevel
+                
+                belowThreshold = 0
+                           
+                if axis in (0,-1): #We work on al the image YZ image
+                    # For each level of threshold we compute the number of voxels
+                    # between level(i) and level(i+1):
+                    thresholdVector = np.empty([self.sizeX, nLevel])    
+                    
+                    # Creation of the feature matrix:
+                    features = np.empty([self.nData, (nLevel-1)*self.sizeX])
+                    
+                    # For each image we compute the threshold:
+                    for iImage in range(self.sizeX):
+                        # The image 2D:
+                        image2D = image3D[iImage,:,:]
+                                                   
+                        for i, level in enumerate(levelVector):
+                            thresholdVector[iImage, i] = - belowThreshold + \
+                                len(np.where(image2D<level)[0])
+                            belowThreshold += thresholdVector[iImage, i]
+                        features[iDataset,:] = thresholdVector[:,1:].flatten()
+                                                  
+#                        for k in range (self.sizeY):
+#                            for n in range (self.sizeZ):
+#                                for i, level in enumerate(levelVector):
+#                                    if image2D[k,n] < level :
+#                                        thresholdVector[iImage, i] += 1
+#                                        break
+#                        for j in range(nLevel-1, 0, -1):
+#                            thresholdVector[iImage, j] -= thresholdVector[iImage, j-1]
+
+                    if axis == -1:
+                        features[iDataset,:] = 100*thresholdVector[:, 1:].flatten() /self.nVoxels
+                    else:
+                        features[iDataset,:] = 100*np.sum(thresholdVector[:, 1:], axis=0) /self.nVoxels
+                                
+                    status = (100 * (iDataset+1) / (self.nData))
+                    if iDataset == 0:
+                        endTime = time.time()
+                        time1Iteration = endTime - startTime
+                        totalTime = 100 * time1Iteration / status
+                        
+                    if status > CalculDone * sampleStatus:
+                            CalculDone += 1
+                            statusBar += "="
+                            remainingTime = int(round(totalTime * (1 - CalculDone*sampleStatus/100))) 
+                            #print("\r" + statusBar)
+                            sys.stdout.write("\r" + "=" * CalculDone + \
+                                 " " * (nbSampleStatus-CalculDone) + str(remainingTime)+"s" )
+                            sys.stdout.flush() 
+                    
+                elif axis == 1: #We work on al the image XZ image
+                    # For each level of threshold we compute the number of voxels
+                    # between level(i) and level(i+1):
+                    thresholdVector = np.empty([self.sizeY, nLevel])    
+                    
+                    # Creation of the feature matrix:
+                    features = np.empty([self.nData, nLevel])
+                    
+                    for iImage in range(self.sizeY):
+                        # The image 2D:
+                        image2D = image3D[:,iImage,:]
+                                                   
+                        for i, level in enumerate(levelVector):
+                            thresholdVector[iImage, i] = - belowThreshold + \
+                                np.len(np.where(image2D<level)[0])
+                            belowThreshold += thresholdVector[iImage, i]
+                        features[iDataset,:] = thresholdVector.flatten()
+                
+                elif axis == 2: #We work on al the image XY image
+                    # For each level of threshold we compute the number of voxels
+                    # between level(i) and level(i+1):
+                    thresholdVector = np.empty([self.sizeZ, nLevel])    
+                    
+                    # Creation of the feature matrix:
+                    features = np.empty([self.nData, nLevel])
+                    
+                    for iImage in range(self.sizeZ):
+                        # The image 2D:
+                        image2D = image3D[:,:,iImage]
+                                                   
+                        for i, level in enumerate(levelVector):
+                            thresholdVector[iImage, i] = - belowThreshold + \
+                                np.len(np.where(image2D<level)[0])
+                            belowThreshold += thresholdVector[iImage, i]
+                        features[iDataset,:] = thresholdVector.flatten()
+         
+             
+        
+        print(features.shape)
+        return features
+
+
+                      
 ###############################################################################          
 ###############################################################################      
             
@@ -346,10 +546,10 @@ class Prediction:
         return parameters
         
         
-    def buildClassifier( self, featureDic=[], labelTraining=[], classifier = "LASSO"):
+    def buildClassifier( self, featureTraining, labelTraining=[], classifier = "LASSO", crossValid = False):
         
-        label = labelTraining	
-        featureMatrix = featureDic["training"]
+        label = labelTraining    
+        #featureTraining
         #parameters of classifiers:
         #copy_X: to copy the input data and do not overwrite
         #n_jobs: number of jobs used for computation. -1 means all CPUs will be used
@@ -357,86 +557,176 @@ class Prediction:
         
         if classifier == "Linear regression":
             clf = linear_model.LinearRegression(copy_X=True, n_jobs=-1, \
-                                                normalize=False)
+                                                normalize=True)
         elif classifier == "LASSO":
-            clf = linear_model.Lasso(alpha=2000, copy_X=True, \
-                                     normalize=False, tol=0.1)
+            clf = linear_model.Lasso(alpha=0.1, copy_X=True, \
+                                     normalize=True, tol=0.0001)
         elif classifier == "Ridge":
-            clf = linear_model.Ridge(alpha=2000, copy_X=True, \
-                                     normalize=False, solver='auto', tol=0.1)
+            clf = linear_model.Ridge(alpha=0.5, copy_X=True, \
+                                     normalize=True, solver='lsqr', tol=0.001)
         elif classifier == "RidgeCV": #ridge cross validation
-            clf = linear_model.RidgeCV(alphas=[0.1, 0.5, 1.0, 10.0], cv=10, \
-                                       fit_intercept=True, normalize=True )
-        elif classifier == "SVR-RBF": #support vector regression with Radial Basis Function kernel
-            clf = SVR(kernel='rbf', C=1e3, gamma=0.1)
+            clf = linear_model.RidgeCV( alphas=[0.0, 0.01, 10.0], cv=None, fit_intercept=True, normalize=True )
         elif classifier == "SVR-Linear": #support vector regression with linear kernel
             clf = LinearSVR( C=1, epsilon=0 )
-        elif classifier == "GaussianNB":
-            clf = GaussianNB()
             
-        clf.fit( featureMatrix, label )
+        #label = np.concatenate((self.label,np.zeros(self.nFeatures)))
+        label = label.reshape( label.size, 1 )
+#        if crossValid == False:
+#            print("Feature shape: ", featureTraining.shape)
+#            print("Label shape: ", label.shape)
+
+        clf.fit( featureTraining, label ) 
         
-        parameters =[]
-        #if classifier != "SVR-RBF" and classifier != "GaussianNB":
-        #    parameters = clf.coef_
-        #    parameters = parameters.reshape( clf.coef_.size, 1)
-        #    print("calculou coef")
-                
+        
+        parameters = clf.coef_
+        parameters = parameters.reshape(clf.coef_.size, 1)
+        parameters = np.append( clf.intercept_, parameters)
+        
+        #print( mean_squared_error( y_test, ( regression.predict( x_test ) ) ) )
+        
         return clf, parameters
         
             
-    def predict(self, parameters, featureDic=[], labelValidation=[], clf=[]):
+    def predict(self, parameters, features, crossValid = False, labelValidation=[]):
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
-        features = featureDic["validation"]
+        
         nbSamples = features.shape[0]
-        
+
+        #print(features.shape)
+        #print(parameters.shape)
+        bias = np.ones([nbSamples,1])
+        features = np.concatenate((bias, features), axis=1)
         # Prediction of the model for the given dataset:
-        if len(parameters) == 0:
-            predictedData = clf.predict(features)
-            print("clf predict")
-        else:
-            predictedData = features.dot( parameters )
-            
-        #predictedData = np.rint(predictedData)
-        
-        print("Predicted data: ", predictedData.shape)
+        predictedData = features.dot( parameters )        
         
         if len(labelValidation) != 0:
             
             # Computation of the mean squared error of the predicted data:
-            MSE = round(np.mean((predictedData - labelValidation)**2)) 
+            MSE = (np.mean((predictedData - labelValidation)**2)) 
             
-            print("The achieved score is: " + str(MSE))
-            
-            print( " MSE: ", mean_squared_error( labelValidation, predictedData ) )
             
             # we sort the label (ascending order) and the predicted data:
             indexSort = np.argsort(labelValidation)
             labelSort = np.array(labelValidation[indexSort])
             predictedDataSort = np.array(predictedData[indexSort])
+            #predictionsR = np.array(predictions[indexSort])
             
             # X-axis:
             x = np.linspace(1, nbSamples, nbSamples)
-            print("number of samples: ", nbSamples)
+            if crossValid == False:
+                print("The achieved score is: " + str(( round(MSE) )))
+                #print( " MSE: ", mean_squared_error( labelValidation, predictedData ) )
+                print("number of samples: ", nbSamples)
             
-            import matplotlib.pyplot as plt
-            import pylab
-            plt.figure(100)
-            feature0 = features[:,0]
-            plt.plot(x, feature0, color="green", linewidth=1, \
-                     linestyle='--', marker='o')
-            plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
-                     linestyle='--', marker='o')
-            plt.plot(x, labelSort, color="red", linewidth=1, \
-                     linestyle='--', marker='o')
-            plt.title("Validation of the model")
-            plt.xlabel("Patient number")
-            plt.ylabel("Age")
             
-            pylab.show()
+                #import pylab
+                plt.figure(100)
+                plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
+                         linestyle='--', marker='o')
+                plt.plot(x, labelSort, color="red", linewidth=1, \
+                         linestyle='--', marker='o')
+               
+                plt.title("Validation of the model")
+                plt.xlabel("Patient number")
+                plt.ylabel("Age")
+            return predictedData, MSE
+            #pylab.show()
             
         return predictedData
         
                     
+    def crossValidation(self, nFold=10, typeCV="random"):
+        featuresMatrix = self.features 
+        label = self.label
+        
+        # Number of samples in the training dataset
+        nSamples = self.nSamples
+        
+        # We shuffle the indices of the feature matrix in the first dimension 
+        # (number of samples)
+        if typeCV == "random":
+            # Array with the indices of the sample in the dataset
+            indices = np.arange(nSamples)
+            
+            # We shuffle the indices
+            indicesShuffled = np.random.shuffle(indices)
+            featuresMatrix = featuresMatrix[indicesShuffled, :][0,:,:]
+        
+        # Array with the indices of the sample in the dataset:
+        indices = np.arange(nSamples)
+        
+        # Number of samples in one training fold:
+        samplePerFoldTrain = int(np.floor(nSamples / nFold))
+            
+        # Number of samples used for training in cross validation:
+        sampleTrain = (nFold-1) * samplePerFoldTrain
+
+        # Number of samples used for training over all the cross validation 
+        # process
+        sampleTrainCV = nFold * samplePerFoldTrain
+
+        # Number of samples used for validation
+        sampleValid = nSamples - sampleTrain
+        
+        # Creation of the dictionary containing the indices of the samples used
+        # for training for each bucket
+        indexTrain = {}
+            
+        # Creation of the dictionary containing the indices of the samples used
+        # for validation for each bucket
+        indexValid = {}
+        
+        # Creation of the array containing the MSE error for each cross 
+        # validation
+        MSEArray = np.zeros([nFold])         
+        
+        # Matrix containing all the predictions:
+        predictions = np.empty([sampleTrainCV])
+        
+        for i in range(nFold):
+            
+            # We divide the all training dataset into K buckets (or folds):
+            indexValid = np.arange(i*samplePerFoldTrain, i*samplePerFoldTrain + sampleValid )
+            indexTrain = np.delete(indices, indexValid)
+            
+            # We compute the model parameters
+            _, parameters = self.buildClassifier(featuresMatrix[indexTrain, :], \
+                            crossValid = True, labelTraining=label[indexTrain], classifier = "RidgeCV")
+           
+            # We predict the data with the computed parameters
+            predictedData, MSEArray[i] = self.predict(parameters, \
+                          featuresMatrix[indexValid, :], crossValid = True, labelValidation=label[indexValid])
+  
+            # We save the predicted data in the appropriate matrix:
+            predictions[i*samplePerFoldTrain : (i+1)*samplePerFoldTrain] = predictedData[:samplePerFoldTrain]
+            
+        # We compute the overall mean-squared error:
+        MSE = round(np.mean(MSEArray),1)
+        
+        # we sort the label (ascending order) and the predicted data:
+        labelComparison = label[:sampleTrainCV]
+        indexSort = np.argsort(labelComparison)
+        labelSort = np.array(labelComparison[indexSort])
+        predictedDataSort = np.array(predictions[indexSort])
+        
+        # Plot the predicted data and the true data:
+        plt.figure(100)
+        
+         # X-axis:
+        x = np.linspace(1, sampleTrainCV, sampleTrainCV)
+            
+        # Plot of the predicted labels:
+        plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
+                 linestyle='--', marker='o')
+        
+        # Plot of the true labels:
+        plt.plot(x, labelSort, color="red", linewidth=1, \
+                 linestyle='--', marker='o')
+       
+        plt.title("Validation of the model")
+        plt.xlabel("Patient number")
+        plt.ylabel("Age")
+            
+        return MSE
             

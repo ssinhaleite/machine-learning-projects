@@ -12,6 +12,12 @@ import nibabel as nib
 import imageAnalysis as ia
 import importlib
 import MachineLearningAlgorithms as ml
+import matplotlib.pyplot as plt
+
+#valentin
+#path = "D:/Machine Learning/"
+#vleite
+path = "./data/"
 
 print("\nLibraries imported")
 
@@ -20,7 +26,7 @@ ia = importlib.reload(ia)
 ml = importlib.reload(ml)
 print("\nLibraries reloaded")
 
-#%% LOADING DATA:
+#%% LOADING OF THE FUNCTIONS:
 def loadData( path, strDataset, strName, nSamples ):
     # Size of the image:
     xSize = 176
@@ -51,8 +57,7 @@ def loadData( path, strDataset, strName, nSamples ):
     
     return datasetDic
 
-#%% FEATURES EXTRACTION:
-def featuresExtraction( ml, datasetDic):
+def featuresExtraction(datasetDic, featureDic):
     # We create an object of the class Features from the trainDataset dictionary:
     dataSet = ml.Features(datasetDic)
 
@@ -69,16 +74,16 @@ def featuresExtraction( ml, datasetDic):
             be interpreted as the polynomial order on which we want to fit 
             the given feature
     """
-    featureDic = {"gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["mean"]}, \
+#    featureDic = {"gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["mean"]}, \
                   #"gridOperation": { "nGrid":(176,208), "npoly":1, "typeOp":["mean"]}, \
 #                  "gridOperation": { "nGrid":(8,8,8), "npoly":2, "typeOp":["mean"]}, \
 #                  "gridOperation": { "nGrid":(8,8,8), "npoly":2, "typeOp":["sum"]}, \
-                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["cov"]}, \
-                  "gridOperation": { "nGrid":(5,5), "npoly":1, "typeOp":["energy"]}, \
+#                  "gridOperation": { "nGrid":(8,8,8), "npoly":1, "typeOp":["cov"]}, \
+#                  "gridOperation": { "nGrid":(5,5), "npoly":1, "typeOp":["energy"]}, \
 #                  "gridOperation": { "nGrid":(8,8), "npoly":1, "typeOp":["homogeneity"]}, \
 #                  "gridOperation": { "nGrid":(8,8), "npoly":1, "typeOp":["dissimilarity"]} \
 #                  "gridOperation": { "nGrid":(8,8), "npoly":1, "typeOp":["contrast"]} \
-                 } 
+#                 } 
 
     # Use of the function featureExtraction to extract the features selected in the		
     # dictionary featureDic:		
@@ -90,10 +95,13 @@ def featuresExtraction( ml, datasetDic):
     
     return featureMatrix
 
+print("\nFunctions loaded")
+
 #%% LOADING OF THE LABELS OF THE TRAINING DATASET:
+strLabel = "targets.csv"
 
 # Loading of the labels of the training dataset:
-label = np.genfromtxt('data/targets.csv', delimiter=',').astype(int)
+label = np.genfromtxt(path+strLabel, delimiter=',').astype(int)
 
 # Number of labeled patients, i.e number of 3D MRI images:
 nSamples = label.size
@@ -108,7 +116,6 @@ print("\nLabels loaded. There are " + str(nSamples) + " samples in the dataset")
 
 #%% LOADING OF THE LABELED DATASET:
 # Loading of the images from the training dataset:
-path = "data/" 
 strDataset = "set_train"
 strName = "train_"
 
@@ -116,71 +123,85 @@ datasetDic = loadData( path, strDataset, strName, nSamples )
 
 print("\nThe dataset dictionary containing all the 3D images of the labeled dataset has been created")		
 
-#%% CREATION OF THE TRAINING AND VALIDATION DATASETS:
+#%% FEATURES EXTRACTION:
 ml = importlib.reload(ml)
+featureDic = {}
+
+## 2D grid operation:
+#featureDic["gridOperation"] = { "nGrid":(15,15), "npoly":2, "axis":0, \  
+#    "typeOp":["mean", "var"]}
+#
+## 3D grid operation:
+featureDic["gridOperation"] = { "nGrid":(15,15,15), "npoly":1, "typeOp":["mean","var"]}
+
+# 3D grid operation:
+#featureDic["threshold"]  = { "nLevel":20, "thresholdType": "Energy", "axis":-1 }
+
 #extracting features from the dataset
-featureMatrix = featuresExtraction( ml, datasetDic)
-# We create an object of the class Prediction from the trainDataset dictionary:		
-data2Predict = ml.Prediction(featureMatrix, label)		
-# The training dataset is randomaly divided into 2 datasets, one for the 		
-# training, the other for the validation:		
-# Ratio of the overall training dataset used for real training and used for 		
-# validation:		
-indexSplit, labelTraining, labelValidation = data2Predict.datasetSplit(ratioSplit = 0.7)		
-print("Training and validation datasets created")		
+featureMatrix = featuresExtraction( datasetDic, featureDic)
 
-#%% MODEL PARAMETER COMPUTATION:		
-# Once we have the indices creating the 2 datasets, we can determine the two 		
-# datasets using the function featureSplit:		
-featureDic = data2Predict.featureSplit (**indexSplit)		
-# The parameters of the model are computed on the training data set using the 		
-# function modelParameters:		
-#parameters = data2Predict.modelParameters(featureDic, shrinkageParameter = 0, \
-#                                          technique = "LS")		
-clf, parameters = data2Predict.buildClassifier(featureDic, labelTraining, classifier = "RidgeCV")		
+#%% CROSS VALIDATION PREDICTION AND SCORES:
+ml = importlib.reload(ml)
+data2Predict = ml.Prediction(featureMatrix, label)    
+    
+MSECV = data2Predict.crossValidation(nFold=10, typeCV="random")
 
-print("The parameters of the model has been computed")	
-	
-#%% VALIDATION OF THE MODEL:		
-# We use the validation dataset to compute the mean squared error between the 		
-# labels calculated with our model and the real labels:		
-predictedData = data2Predict.predict(parameters, featureDic, labelValidation, clf)		
+print("After cross-validation, we obtain a score of {}".format(MSECV))    
+
+#%% COMPUTATION OF THE MODEL PARAMETERS ON THE WHOLE LABELED DATASET:
+print(featureMatrix.shape)
+_, modelParameters = data2Predict.buildClassifier(featureMatrix, \
+             crossValid = False, labelTraining=label, classifier = "RidgeCV")
+
+# Prediction of the data using the model parameters:
+_, MSESelf = data2Predict.predict(modelParameters, featureMatrix,\
+                              crossValid = False, labelValidation = label)  
+
+print("Our model tested on the data used for training gives a score of {}".format(round((MSESelf),3)))      
+
 #%% LOADING OF THE NON-LABELED DATASET:    
 # Loading of the images from the test dataset:
-path = "data/" 
 strDataset = "set_test"
 strName = "test_"
 
-datasetDic = loadData( path, strDataset, strName, 138 )
+datasetTestDic = loadData( path, strDataset, strName, 138 )
 
-print("\nThe dataset dictionary containing all the 3D images of the test dataset has been created")		
+print("\nThe dataset dictionary containing all the 3D images of the test dataset has been created")        
     
 ml = importlib.reload(ml)
+
 #extracting features from the dataset
-featureMatrix = featuresExtraction( ml, datasetDic)
+featureMatrixTest = featuresExtraction(datasetTestDic, featureDic)
 
 #%% PREDICTION FOR THE NON-LABELED DATASET:
 
-# We create an object of the class Prediction from the trainDataset dictionary:		
-unlabeledData= ml.Prediction(featureMatrix)
-#all data should be predicted
-featureDic["validation"] = featureMatrix	
-newPrediction = unlabeledData.predict(parameters, featureDic, clf=clf)
+# We create an object of the class Prediction from the trainDataset dictionary:        
+unlabeledData= ml.Prediction(featureMatrixTest)
+
+print(modelParameters.shape)
+print(modelParameters.shape)
+testPrediction = unlabeledData.predict(modelParameters, featureMatrixTest)
+
+# Plot the predicted data and the true data:
+plt.figure(102)
+
+ # X-axis:
+x = np.linspace(1, 138, 138)
+    
+# Plot of the predicted labels:
+plt.plot(x, testPrediction, color="blue", linewidth=1, \
+         linestyle='--', marker='o')
+plt.xlabel("Patient number")
+plt.ylabel("Age")
+
 
 #%% WRITING ANSWER
-fileIO = open( 'data/submissionRidgeCV_2410_0.8.csv','w' )
+fileStr = 'submission.csv'
+
+fileIO = open( path + fileStr,'w' )
 fileIO.write( 'ID,Prediction\n' )
-#answer = np.rint(newPrediction).astype(int)
-for i in range( len( newPrediction ) ):
-    fileIO.write( str(i+1) + ',' + str(newPrediction[i]).strip('[]') + '\n' )
+answer = np.rint(testPrediction).astype(int)
+for i in range( len( testPrediction ) ):
+    fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
 fileIO.close()
 
-
-
-"""
-# We create an object of the class ImageProperties from the imageData:
-image_Young = ia.ImageProperties(dataset[0]**1.)
-image_Old = ia.ImageProperties(dataset[1]**1.)
-
-image_Young.compare(image_Old)
-"""
