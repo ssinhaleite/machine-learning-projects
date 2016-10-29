@@ -449,9 +449,7 @@ class Features:
                                 np.len(np.where(image2D<level)[0])
                             belowThreshold += thresholdVector[iImage, i]
                         features[iDataset,:] = thresholdVector.flatten()
-         
-             
-        
+
         print(features.shape)
         return features
 
