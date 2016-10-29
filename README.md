@@ -47,6 +47,7 @@ In the Feature class you can find our implementation for feature extraction. We 
 | homogeneity | x|	| |
 
 Meanwhile in the Prediction class you can find implementations of some linear regression algorithms as well as some implementations using libraries as sklearn. Besides that you can find the code for split the training data between training and validation dataset also our implementation of cross validation.
+
 Linear Regression algorithms:
 
 1. Basic linear regression (without regularization)
