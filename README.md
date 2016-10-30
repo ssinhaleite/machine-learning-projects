@@ -11,27 +11,27 @@ Project 01
 
 Objective:
 ----------
-- Predicting a person's age from brain MR images: in this project we apply regression techniques to predict a person's age from a three-dimensional magnetic resonance (MR) image of their brain.
+- Predicting a person's age from his 3D brain magnetic resonance image (MRI). In order to reduce the volume of the data, some specific features are extracted from the MRI. To achieve the age prediction, a labeled dataset is used for training our prediction model using different kind of linear regression techniques (Lasso, Ridge). The accuracy of our model and our feature selection are then estimated by cross-validation. Once our better model selected, we applied it to the test dataset (non-labeled) to predict the patient's age.  
 
 
 About the code:
 ---------------
 
 ### General:
-This code was created as an structure for the three projects in this course. It is carefully commented and organized.
-Contains:
+This code was designed in order to be used as a structure for the three projects in this course. It is carefully commented and organized.
+Our code is divided into three files as described below:
 - **imageAnalysis.py**: contains definition of MRI as an image. Used for plot the MRI and to compare two images.
-Example of usage:
+Example of use:
 
 ```
-image_Young = ia.ImageProperties(dataset[0]**1.)
-image_Old = ia.ImageProperties(dataset[1]**1.)
+image_1 = ia.ImageProperties(dataset[0]**1.)
+image_2 = ia.ImageProperties(dataset[1]**1.)
 
-image_Young.compare(image_Old)
+image_1.compare(image_2)
 ```
 
 - **MachineLearningAlgorithms.py**: contains two classes - Features and Prediction.
-In the Feature class you can find our implementation for feature extraction. We extract features for 2D and for 3D as well. We implement a `grid` and also a `threshold` operation. The `grid` operation extract the selected feature using the given grid as a mask. The `threshold`operation we ....
+In the Feature class you can find our implementation for feature extraction. We extract features from 2D or 3D subsamples of the whole 3D MRI. We implement a `grid` and a `threshold` functions. The `grid` function divide the space into small volumes (3D)or areas (2D) on which some mathematical opérations are processed (mean, variance, maximum value...). The `threshold`function counts the number of voxels being in a specific intensity range. However, this function has not been carefully tested yet and we strongly recommand not to use it before a new version.
 
 |			 | 2D Features | 3D Features |
 |:-----:|:-----------:|:-----------:|
@@ -46,9 +46,9 @@ In the Feature class you can find our implementation for feature extraction. We 
 | dissimilarity | x|	|
 | homogeneity | x|	| |
 
-Meanwhile in the Prediction class you can find implementations of some linear regression algorithms as well as some implementations using libraries as sklearn. Besides that you can find the code for split the training data between training and validation dataset also our implementation of cross validation.
+In the Prediction class, a function (buildclassifier) is defined to perform linear regression using technique like Ridge or Lasso. We first implemented our own version of Ridge but since it gives exactly the same results as the one defined  in the machine learning library sklearn but in a longer time. This is why, we have decided to use this library. We also coded a function (crossvalidation) to perform a cross-validation in order to validate our model and feature selection.
 
-Linear Regression algorithms:
+Linear Regression techniques usables within the buildclassifier function:
 
 1. Basic linear regression (without regularization)
 2. Lasso
@@ -57,7 +57,13 @@ Linear Regression algorithms:
 5. SVR-Linear (Support Vector Regression with Linear kernel)
 
 
-- **predict_final.py**: contains the main structure of our code, i. e., the whole workflow: load the training data, load the known predictions, divide the training data in training and validation, extract features, find the parameters for the selected model, load the test data, extract features, get predictions and write the result in a output file.
+- **predict_final.py**: This script contains the main structure of our code, i. e., the whole workflow. Among other things, it allows doing the following actions:
+1. It loads the training data and its labels, 
+2. It extracts the right features, 
+3. It finds the parameters of our model,
+4. It estimates the accuracy of our model and feature selection through a cross-validation stage,
+5. It load the test data, extracts the features and gets the predictions 
+6. and write the result in a output file.
 
 ### Dependencies:
 * python 3.5
