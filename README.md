@@ -6,18 +6,64 @@
 * Valentin Gallet
 * Vanessa Rodrigues Coelho Leite
 
+## Dependencies:
+* python 3.5
+* numpy
+* nibabel
+* importlib
+* matplotlib
+* sklearn
+* skimage
+
+## Configure:
+
+For using this code you need to define three variables:
+* `path`: the path of the folder where your data (training and test) are located.
+* `strDataSet`: name of the folder where you data is located. We assume the folder's name for training is `set_train` and the folder's name for test is `set_test`
+* `strName`: name of your nii files (3d MRI). We assume the name of training data files is `train_x.nii` and for the test data files is `test_x.nii`, where x is the number of the file.
+
+
 Project 01
 ==========
 
 Objective:
 ----------
-- Predicting a person's age from his 3D brain magnetic resonance image (MRI). In order to reduce the volume of the data, some specific features are extracted from the MRI. To achieve the age prediction, a labeled dataset is used for training our prediction model using different kind of linear regression techniques (Lasso, Ridge). The accuracy of our model and our feature selection are then estimated by cross-validation. Once our better model selected, we applied it to the test dataset (non-labeled) to predict the patient's age.  
+- Predicting a person's age from his 3D brain magnetic resonance image (MRI). In order to reduce the volume of the data, some specific features are extracted from the MRI. To achieve the age prediction, a labeled dataset is used for training our prediction model using different kind of linear regression techniques (Lasso, Ridge). The accuracy of our model and our feature selection are then estimated by cross-validation. Once our better model selected, we applied it to the test dataset (non-labeled) to predict the patient's age.
+
+Approach:
+---------
+
+To predict a persons age using the MRI information, we used the following approach:
+
+* pre-processing: the MRI data contain some areas with no relevent information. We identified visually the region that limits our areas of interest and therefore discarded the first 14 and last 18 voxels in `x` dimension, the first 12 and the last 15 voxels in `y` dimension and the first 3 and last 20 voxels in `z` dimension.
+
+* feature extraction: After having selected the voxels of interest, we divided the 3D MRI into small volumes (3D) or areas (2D) on which some mathematical operations were processed (mean, variance, maximum value...).
+
+* Creation of the model: We train our model on the extracted features. We estimate the accuracy of the model by testing different combination of features and of linear regression techniques. We finally chose the model given the smallest mean-squared error after cross-validation. Inparticular, the best results was achieved using mean and variance with a 15x15x15 grid and the ridge regression.
+
+* prediction: Once our model defined, we applied this latter to the test dataset with the same preprocessing and feature extraction to finally obtain the predictions and written them in a text file.
+
+
+Project 02:
+===========
+
+Objective:
+----------
+
+Classifying brain health status from MR images
+In this project you will classify a person's cognitive health status only from an MR scan of their brain.
+
+Approach:
+---------
+
 
 
 About the code:
----------------
+===============
 
-### General:
+General:
+--------
+
 This code was designed in order to be used as a structure for the three projects in this course. It is carefully commented and organized.
 Our code is divided into three files as described below:
 
@@ -66,42 +112,25 @@ Linear Regression techniques usables within the buildclassifier function:
 5.It load the test data, extracts the features and gets the predictions 
 6.and write the result in a output file.
 
-### Dependencies:
-* python 3.5
-* numpy
-* nibabel
-* importlib
-* matplotlib
-* sklearn
-* skimage
 
-### Configure:
+Usage:
+------
+To use our code you just need to configure your project (as explained above) and run in a `cmd` command:
 
-For using this code you need to have define three variables:
-* `path`: the path of the folder where your data (training and test) are located.
-* `strDataSet`: name of the folder where you data is located. We assume the folder's name for training is `set_train` and the folder's name for test is `set_test`
-* `strName`: name of your nii files (3d MRI). We assume the name of training data files is `train_x.nii` and for the test data files is `test_x.nii`, where x is the number of the file.
-
-### Usage:
-To use our code you just need to run in a cmd command:
 ```
 python predict_final.py
 ```
-After that, our programm will run, printing some informations on terminal and will write in the informed `path` a file named submission.csv. This output file has two columns: the first is the number of the test data and the second is the age prediction. The first line of each output file contains a header (ID, Prediction).
 
-### Approach:
-To predict a persons age using the MRI information, we used the following approach:
+After that, our programm will run, printing some informations on terminal and will write in the informed `path` a file named submission.csv. 
 
-* pre-processing: the MRI data contain some areas with no relevent information. We identified visually the region that limits our areas of interest and therefore discarded the first 14 and last 18 voxels in `x` dimension, the first 12 and the last 15 voxels in `y` dimension and the first 3 and last 20 voxels in `z` dimension.
+* For prediction: the output file has two columns; the first is the number of the test data and the second is the age prediction. The first line of each output file contains a header (ID, Prediction).
+* For classification: the output file has one column; this column contains `0` or `1` without header.
 
-* feature extraction: After having selected the voxels of interest, we divided the 3D MRI into small volumes (3D) or areas (2D) on which some mathematical operations were processed (mean, variance, maximum value...).
 
-* Creation of the model: We train our model on the extracted features. We estimate the accuracy of the model by testing different combination of features and of linear regression techniques. We finally chose the model given the smallest mean-squared error after cross-validation. Inparticular, the best results was achieved using mean and variance with a 15x15x15 grid and the ridge regression.
+References:
+===========
 
-* prediction: Once our model defined, we applied this latter to the test dataset with the same preprocessing and feature extraction to finally obtain the predictions and written them in a text file.
-
-### References:
-To choose our features and model we use the materials given during the lectures and seminares and by reading some papers and books:
+To choose our features and models we use the materials given during the lectures and seminares and by reading some papers and books:
 ```
 * Bishop, "Pattern Recognition And Machine Learning" - Springer  2006
 * Aman Chadha, Sushmit Mallik and Ravdeep Johar, "Comparative Study and Optimization of Feature-Extraction Techniques for Content based Image Retrieval" (International Journal of Computer Applications, 2012)
