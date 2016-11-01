@@ -45,12 +45,7 @@ To predict a persons age using the MRI information, we used the following approa
 
 Evaluation:
 -----------
-- The evaluation metric for this project is Mean-Squared-Error (MSE). The MSE score, a basic measure of fit, represents the average deviation of `n` predictions $y_i$ from their true values yiyi. The Mean-Squared-Error is given by:
-$ \sum_{\forall i}{x_i^{2}} $
-
-MSE=1n∑i=1n(y^i−yi)2
-MSE=1n∑i=1n(y^i−yi)2
-The MSE metric weights large deviations much heavier than small deviations. Consequently, it is particularly vulnerable to outliers.
+- The evaluation metric for this project is Mean-Squared-Error (MSE). The MSE score, a basic measure of fit, represents the average deviation of the predictions from their true values. The MSE metric weights large deviations much heavier than small deviations. Consequently, it is particularly vulnerable to outliers.
 
 Project 02:
 ===========
@@ -64,6 +59,9 @@ In this project you will classify a person's cognitive health status only from a
 Approach:
 ---------
 
+Evaluation:
+-----------
+- The evaluation metric for this project is binary Log-Loss (LL), also known as Cross-Entropy-Loss. The Log-Loss punishes wrong predictions (i.e. false positives and false negatives) compared to the true labels.
 
 
 About the code:
@@ -132,7 +130,7 @@ python predict_final.py
 After that, our programm will run, printing some informations on terminal and will write in the informed `path` a file named submission.csv. 
 
 * For prediction: the output file has two columns; the first is the number of the test data and the second is the age prediction. The first line of each output file contains a header (ID, Prediction).
-* For classification: the output file has one column; this column contains `0` or `1` without header.
+* For classification: the output file has one column; Note that the true labels are either `0` or `1`, but our results are in the interval between 0 and 1, which reflects the uncertainty of our prediction.
 
 
 References:
