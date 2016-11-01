@@ -43,6 +43,14 @@ To predict a persons age using the MRI information, we used the following approa
 
 * prediction: Once our model defined, we applied this latter to the test dataset with the same preprocessing and feature extraction to finally obtain the predictions and written them in a text file.
 
+Evaluation:
+-----------
+- The evaluation metric for this project is Mean-Squared-Error (MSE). The MSE score, a basic measure of fit, represents the average deviation of `n` predictions $y_i$ from their true values yiyi. The Mean-Squared-Error is given by:
+$ \sum_{\forall i}{x_i^{2}} $
+
+MSE=1n∑i=1n(y^i−yi)2
+MSE=1n∑i=1n(y^i−yi)2
+The MSE metric weights large deviations much heavier than small deviations. Consequently, it is particularly vulnerable to outliers.
 
 Project 02:
 ===========
