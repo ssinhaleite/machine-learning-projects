@@ -2,14 +2,17 @@
 
 import numpy as np
 import nibabel as nib
-import imageAnalysis as ia
 import importlib
+
+import sys
+sys.path.append('../src')
+import imageAnalysis as ia
 import MachineLearningAlgorithms as ml
 #import matplotlib.pyplot as plt
 
 # Path of your repositery where you should put the training and the test 
 # dataset
-path = "D:/Machine Learning/"
+path = "./data/"
 
 print("\nLibraries imported")
 
@@ -94,7 +97,7 @@ def featuresExtraction(datasetDic, featureDic):
     dataSet = ml.Features(datasetDic)
     
     # Use of the function featureExtraction (from the MachineLearningAlgorithms
-    # module) to extract the features selected in the dictionary featureDic:		
+    # module) to extract the features selected in the dictionary featureDic:        
     featureMatrix = dataSet.featureExtraction(**featureDic)
 
     # Number of features:
@@ -116,7 +119,7 @@ label = np.genfromtxt(path+strLabel, delimiter=',').astype(int)
 
 # Number of labeled patients, i.e number of 3D MRI images:
 nSamples = label.size
-	
+    
 print("\nLabels loaded. There are " + str(nSamples) + " samples in the dataset")
 
 
@@ -132,7 +135,7 @@ strName = "train_"
 datasetDic = loadData( path, strDataset, strName, nSamples )
 
 print("\nThe dataset dictionary containing all the 3D images of the labeled \
-dataset has been created")		
+dataset has been created")        
 
 
 #%% FEATURES EXTRACTION:
@@ -169,9 +172,9 @@ data2Predict = ml.Prediction(featureMatrix, label)
 
 # We use cross validation to check the accuracy (mean-squared error) of the 
 # chosen features and regularizer parameter (in Ridge or Lasso):
-MSECV = data2Predict.crossValidation(nFold=10, typeCV="random")
+#MSECV = data2Predict.crossValidation(nFold=10, typeCV="random")
 
-print("After cross-validation, we obtain a score of {}".format(MSECV))	
+#print("After cross-validation, we obtain a score of {}".format(MSECV))    
 
 
 #%% COMPUTATION OF THE MODEL PARAMETERS ON THE WHOLE LABELED DATASET:
@@ -186,7 +189,7 @@ modelParameters = data2Predict.buildClassifier(featureMatrix, \
 _, MSESelf = data2Predict.predict(modelParameters, featureMatrix,\
                               labelValidation = label)  
 
-print("Our model tested on the data used for training gives a score of {}".format(round((MSESelf),3)))	  
+print("Our model tested on the data used for training gives a score of {}".format(round((MSESelf),3)))      
 
 
 #%% LOADING OF THE NON-LABELED DATASET:    
@@ -203,7 +206,7 @@ strName = "test_"
 datasetTestDic = loadData( path, strDataset, strName, 138 )
 
 print("\nThe dataset dictionary containing all the 3D images of the test \
-      dataset has been created")		
+      dataset has been created")        
 
 # Extraction of the features of the test dataset:
 featureMatrixTest = featuresExtraction(datasetTestDic, featureDic)
@@ -213,7 +216,7 @@ featureMatrixTest = featuresExtraction(datasetTestDic, featureDic)
 
 ml = importlib.reload(ml)
     
-# We create an object of the class Prediction from the test dataset dictionary:		
+# We create an object of the class Prediction from the test dataset dictionary:        
 unlabeledData= ml.Prediction(featureMatrixTest)
 
 # The labels of the test data set are predicted using the parameters of our 
@@ -232,7 +235,7 @@ testPrediction = unlabeledData.predict(modelParameters, featureMatrixTest)
 #plt.xlabel("Patient number")
 #plt.ylabel("Age")
 
-print("\n The prediction for the non-labeled dataset")	
+print("\n The prediction for the non-labeled dataset")    
 
 #%% WRITING OF THE PREDICTION INTO A .CSV FILE:
 
@@ -246,4 +249,4 @@ for i in range( len( testPrediction ) ):
     fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
 fileIO.close()
 
-print("\n The prediction has been written in a .csv file")	
+print("\n The prediction has been written in a .csv file")
