@@ -9,10 +9,19 @@ from sklearn import linear_model
 #for image manipulation
 from skimage.feature import greycomatrix, greycoprops
 from skimage import img_as_ubyte
+from scipy import stats
 #for classification
 from sklearn.svm import SVC
 from sklearn.metrics import log_loss
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.neural_network import MLPClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.ensemble import VotingClassifier
+from sklearn.gaussian_process.kernels import RBF
+from sklearn.linear_model import LogisticRegression
 
 class Features:
     """ The objects of this class are used to extract the features from a
@@ -153,6 +162,7 @@ class Features:
         # space will be divided
         if len(nGrid) == 2:
             nDimension = 2
+            axis = 2
             type2D = ["center"]
         else:
             nDimension = 3
@@ -248,19 +258,46 @@ class Features:
                                            ylength[iY] : ylength[iY+1]]                
                         for iPolyOrder in range(npoly):
                             for iOp, Op in enumerate(typeOp):
-                                 if Op in ["average", "Average", "mean"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.mean(gridZone)**(iPolyOrder+1)
-                                 elif Op in ["max", "Max"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.amax(gridZone)**(iPolyOrder+1)
-                                 elif Op in ["min", "Min"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.amin(gridZone)**(iPolyOrder+1)
-                                 elif Op in ["variance", "Var", "Expectation", \
-                                             "expectation"]:
-                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                     np.var(gridZone)**(iPolyOrder+1)
+                                if Op in ["average", "Average", "mean"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.mean(gridZone)**(iPolyOrder+1)
+                                elif Op in ["max", "Max"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.amax(gridZone)**(iPolyOrder+1)
+                                elif Op in ["min", "Min"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.amin(gridZone)**(iPolyOrder+1)
+                                elif Op in ["variance", "Var", "Expectation", \
+                                            "expectation"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    np.var(gridZone)**(iPolyOrder+1)
+                                elif Op in ["mode"]:
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    stats.mode((gridZone)**(iPolyOrder+1))
+                                elif Op in ["energy"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'energy')[0, 0]
+                                elif Op in ["contrast"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'contrast')[0, 0]
+                                elif Op in ["dissimilarity"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'dissimilarity')[0, 0]
+                                elif Op in ["homogeneity"]:
+                                    #calcula a GLCM
+                                    gridZone = img_as_ubyte(gridZone)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    featureMatrix[iX, iY, iOp, iPolyOrder] = \
+                                    greycoprops(glcm, 'homogeneity')[0, 0]
                     elif nDimension == 3:
                         for iZ in range(nGridZ):
                             gridZone = datasetDic[iDataset][ \
@@ -311,34 +348,6 @@ class Features:
                                     elif Op in ["sum", "Sum"]:
                                         featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                         np.sum(gridZone)**(iPolyOrder+1)
-                                        
-                                    elif Op in ["energy"]:
-                                        #calcula a GLCM
-                                        gridZone = img_as_ubyte(gridZone)
-                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                        greycoprops(glcm, 'energy')[0, 0]
-
-                                    elif Op in ["contrast"]:
-                                        #calcula a GLCM
-                                        gridZone = img_as_ubyte(gridZone)
-                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                        greycoprops(glcm, 'contrast')[0, 0]
-
-                                    elif Op in ["dissimilarity"]:
-                                        #calcula a GLCM
-                                        gridZone = img_as_ubyte(gridZone)
-                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                        greycoprops(glcm, 'dissimilarity')[0, 0]
-
-                                    elif Op in ["homogeneity"]:
-                                        #calcula a GLCM
-                                        gridZone = img_as_ubyte(gridZone)
-                                        glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
-                                        featureMatrix[iX, iY, iOp, iPolyOrder] = \
-                                        greycoprops(glcm, 'homogeneity')[0, 0]
              
             # Status bar:       
             status = (100 * (iDataset+1) / (self.nData))
@@ -584,32 +593,58 @@ class Prediction:
         #copy_X: to copy the input data and do not overwrite
         #n_jobs: number of jobs used for computation. -1 means all CPUs will be used
         #cv: method for cross-validation. None means use Leave-one-out
-
+        
+        regression = False
+        
         if method == "Linear regression":
             clf = linear_model.LinearRegression(copy_X=True, n_jobs=-1, \
                                                 normalize=True)
+            regression = True
         elif method == "LASSO":
             clf = linear_model.Lasso(alpha=0.1, copy_X=True, \
                                      normalize=True, tol=0.0001)
+            regression = True
         elif method == "Ridge":
             clf = linear_model.Ridge(alpha=0.5, copy_X=True, \
                                      normalize=True, solver='lsqr', tol=0.001)
+            regression = True
         elif method == "RidgeCV": #ridge cross validation
             clf = linear_model.RidgeCV( alphas=[0.0, 0.1, 10.0], cv=None, \
                                        fit_intercept=True, normalize=True )
+            regression = True
         elif method == "SVC":
             clf = SVC(C=1.0, cache_size=200, decision_function_shape='ovr', kernel='rbf', \
                       probability=True, shrinking=True, verbose=True)
         elif method == "RandomForestClassifier":
-            clf = RandomForestClassifier(n_estimators=10, criterion='gini',\
+            clf = RandomForestClassifier(n_estimators=100, criterion='gini',\
                      bootstrap=True, oob_score=True, n_jobs=-1)
+        elif method == "GaussianNB":
+            clf = GaussianNB()
+        elif method == "GaussianNB_isotonic":
+            clf = CalibratedClassifierCV(GaussianNB(), cv=10, method='isotonic')
+        elif method == "GaussianNB_sigmoid":
+            clf = CalibratedClassifierCV(GaussianNB(), cv=10, method='sigmoid')
+        elif method == "MLPClassifier":
+            clf = MLPClassifier(alpha=0.001, hidden_layer_sizes=500, activation='logistic', solver='adam', shuffle=True)
+        elif method == "KNeighborsClassifier":
+            clf =  KNeighborsClassifier(n_neighbors = 2, algorithm='auto', weights='uniform', n_jobs=-1)
+        elif method == "GaussianProcess":
+            clf = GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True, max_iter_predict=200, n_jobs=-1)
+        elif method == "AdaBoostClassifier":
+            clf = AdaBoostClassifier(n_estimators=100)
+        elif method == "VotingClassifier":
+            clf = VotingClassifier(estimators=[('lr', LogisticRegression(random_state=1)), \
+                                               ('rf', RandomForestClassifier(random_state=1)), \
+                                               ('gnb', CalibratedClassifierCV(GaussianNB(), cv=10, method='isotonic'))],\
+                                               voting='soft', n_jobs=-1)
+            
         
         #label = label.reshape( label.size, 1 )
         
         # Use the function fit from the sklearn module
         clf.fit( featureTraining, label ) 
         
-        if (method == "SVC" or method == "RandomForestClassifier"):
+        if (not regression):
             return clf
         # Use the function coef_ from the sklearn module to compute the 
         # parameters of our model:
@@ -638,7 +673,7 @@ class Prediction:
 
         if (classifier):
             predictedData = classifier.predict_proba( features )
-            print(predictedData)
+            #print(predictedData)
         else:
             # The first column of the feature matrix should be the bias:
             bias = np.ones([nbSamples,1])

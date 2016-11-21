@@ -168,10 +168,8 @@ ml = importlib.reload(ml)
 # of this class in particular for predicting the data:
 data2Predict = ml.Prediction(featureMatrix, label)    
 
-# We use cross validation to check the accuracy (mean-squared error) of the 
-# chosen features and regularizer parameter (in Ridge or Lasso):
+#Build n-classifiers and get its answers and then, vote.
 #MSECV, classifiers = data2Predict.crossValidation(nFold=10, typeCV="random")
-
 #print("After cross-validation, we obtain a score of {}".format(MSECV))    
 
 
@@ -180,14 +178,35 @@ data2Predict = ml.Prediction(featureMatrix, label)
 # After having checked the accuracy of our feature selection and linear 
 # regression method, the parameters of our model are determined over the 
 # whole training dataset: 
-classifier = data2Predict.buildClassifier(featureMatrix, \
-             label, method = "RandomForestClassifier")
+
+#clf = data2Predict.buildClassifier(featureMatrix, \
+#             label, method = "RandomForestClassifier" )
+
+classifiersArray = []
+
+classifiersType = []
+classifiersType.append("RandomForestClassifier")
+classifiersType.append("SVC")
+classifiersType.append("GaussianNB")
+classifiersType.append("GaussianNB_isotonic")
+classifiersType.append("GaussianNB_sigmoid")
+classifiersType.append("MLPClassifier")
+classifiersType.append("KNeighborsClassifier")
+classifiersType.append("GaussianProcess")
+classifiersType.append("AdaBoostClassifier")
+classifiersType.append("VotingClassifier")
+
+i = 0
+for classifier in classifiersType:
+    classifiersArray.append( data2Predict.buildClassifier(featureMatrix, \
+             label, method = classifier) )
+    i += 1
 
 # Prediction of the data using the model parameters:
-_, MSESelf = data2Predict.predict(0, featureMatrix,\
-                              classifier=classifier, labelValidation = label)  
-
-print("Our model tested on the data used for training gives a score of {}".format(round(MSESelf,3)))      
+for i in range(len(classifiersArray)):
+    _, MSESelf = data2Predict.predict(0, featureMatrix,\
+                              classifier=classifiersArray[i], labelValidation = label)
+    print("The model {} tested on the data used for training gives a score of {}".format( classifiersType[i], round(MSESelf,3)))      
 
 
 #%% LOADING OF THE NON-LABELED DATASET:    
@@ -219,10 +238,10 @@ unlabeledData= ml.Prediction(featureMatrixTest)
 
 # The labels of the test data set are predicted using the parameters of our 
 #model:
-#testPrediction = np.zeros([classifiers.shape[0]])
-#for i in range(classifiers):
-testPrediction = unlabeledData.predict(0, featureMatrixTest, classifier=classifier)
-print(testPrediction)
+testPredictionArray = []
+for i in range(len(classifiersArray)):
+    testPredictionArray.append(unlabeledData.predict(0, featureMatrixTest, classifier=classifiersArray[i]))
+
 ## Plot the predicted data and the true data:
 #plt.figure(102)
 #
@@ -240,13 +259,15 @@ print("\n The prediction for the non-labeled dataset")
 #%% WRITING OF THE PREDICTION INTO A .CSV FILE:
 
 # Name of the file which will contain our predictions for the test dataset:
-fileStr = 'newSubmission.csv'
+for i in range(len(classifiersArray)):
+    fileStr = classifiersType[i]+ ".csv"
 
-fileIO = open( path + fileStr,'w' )
-fileIO.write( 'ID,Prediction\n' )
-answer = testPrediction[:,1]
-for i in range( len( testPrediction ) ):
-    fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
-fileIO.close()
+    fileIO = open( path + fileStr,'w' )
+    fileIO.write( 'ID,Prediction\n' )
+    answer = testPredictionArray[i][:,1]
+    for i in range( len( answer ) ):
+        fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
+    fileIO.close()
 
 print("\n The prediction has been written in a .csv file")    
+
