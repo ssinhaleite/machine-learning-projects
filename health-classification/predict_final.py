@@ -3,6 +3,7 @@
 import numpy as np
 import nibabel as nib
 import importlib
+import time
 
 import sys
 sys.path.append('../src')
@@ -16,7 +17,7 @@ path = "./data/"
 print("\nLibraries imported")
 
 
-#%% RELOADING OF THE MODIFIED LIBRARIES:
+#% RELOADING OF THE MODIFIED LIBRARIES:
     
 ia = importlib.reload(ia)
 ml = importlib.reload(ml)
@@ -24,7 +25,7 @@ ml = importlib.reload(ml)
 print("\nLibraries reloaded")
 
 
-#%% LOADING OF THE FUNCTIONS USED IN THE SCRIPT:
+#% LOADING OF THE FUNCTIONS USED IN THE SCRIPT:
 def loadData( path, strDataset, strName, nSamples ):
     """ To load the 3D MRI images of a dataset
     
@@ -96,18 +97,18 @@ def featuresExtraction(datasetDic, featureDic):
     
     # Use of the function featureExtraction (from the MachineLearningAlgorithms
     # module) to extract the features selected in the dictionary featureDic:        
-    featureMatrix = dataSet.featureExtraction(**featureDic)
+    featureMatrix, binEdges = dataSet.featureExtraction(**featureDic)
 
     # Number of features:
     nFeatures = featureMatrix.shape[1]
     print("\nThe features matrix is computed. There are {} different features".format(nFeatures))
     
-    return featureMatrix
+    return featureMatrix, binEdges
 
 print("\nFunctions loaded")
 
 
-#%% LOADING OF THE LABELS OF THE TRAINING DATASET:
+#% LOADING OF THE LABELS OF THE TRAINING DATASET:
 
 # File name where is the labels of the training dataset:
 strLabel = "targets.csv"
@@ -121,7 +122,7 @@ nSamples = label.size
 print("\nLabels loaded. There are " + str(nSamples) + " samples in the dataset")
 
 
-#%% LOADING OF THE LABELED DATASET:
+#% LOADING OF THE LABELED DATASET:
 
 # Name of the training dataset folder
 strDataset = "set_train"
@@ -132,6 +133,8 @@ strName = "train_"
 # Loading of the images from the training dataset and saving in a dictionary:
 datasetDic = loadData( path, strDataset, strName, nSamples )
 
+imageCroped = ia.ImageProperties(datasetDic[100])
+imageCroped.toPlot()
 print("\nThe dataset dictionary containing all the 3D images of the labeled \
 dataset has been created")        
 
@@ -154,63 +157,178 @@ featureDic = {}
 
 # Feature dictionary used for obtaining our best score:
 featureDic["gridOperation"] = { "nGrid":(9,9,9), "npoly":1, \
-                                "typeOp":["mean","var"]}
+                                "typeOp":["histogram"], "binEdges":35}
+#                                "typeOp":["mean","var"]}
             
 # Extraction of the features we want from the training dataset:
-featureMatrix = featuresExtraction( datasetDic, featureDic)
-
-
-#%% CROSS VALIDATION PREDICTION AND SCORES:
-    
+featureMatrix, binEdges = featuresExtraction( datasetDic, featureDic)
+        
 ml = importlib.reload(ml)
 
 # We create an object of the class Prediction to be able to use the functions
 # of this class in particular for predicting the data:
 data2Predict = ml.Prediction(featureMatrix, label)    
 
-#Build n-classifiers and get its answers and then, vote.
-#MSECV, classifiers = data2Predict.crossValidation(nFold=10, typeCV="random")
-#print("After cross-validation, we obtain a score of {}".format(MSECV))    
+#%% indicates if should use dictionary for mehods and ensemble or if it is to use the same kind of classifier n times.
+isToUseMethodDic = False
 
-
-#%% COMPUTATION OF THE MODEL PARAMETERS ON THE WHOLE LABELED DATASET:
+if isToUseMethodDic == True:
+    #%% METHOD SELECTION AND INPUTS
+    # Chosen method used for classification or regression --> methodML
+    # Dictionary containing the input of the chosen method --> methodDic                    
     
-# After having checked the accuracy of our feature selection and linear 
-# regression method, the parameters of our model are determined over the 
-# whole training dataset: 
-
-#clf = data2Predict.buildClassifier(featureMatrix, \
-#             label, method = "RandomForestClassifier" )
-
-classifiersArray = []
-
-classifiersType = []
-classifiersType.append("RandomForestClassifier")
-classifiersType.append("SVC")
-classifiersType.append("GaussianNB")
-classifiersType.append("GaussianNB_isotonic")
-classifiersType.append("GaussianNB_sigmoid")
-classifiersType.append("MLPClassifier")
-classifiersType.append("KNeighborsClassifier")
-classifiersType.append("GaussianProcess")
-classifiersType.append("AdaBoostClassifier")
-classifiersType.append("VotingClassifier")
-
-i = 0
-for classifier in classifiersType:
-    classifiersArray.append( data2Predict.buildClassifier(featureMatrix, \
-             label, method = classifier) )
-    i += 1
-
-# Prediction of the data using the model parameters:
-for i in range(len(classifiersArray)):
-    _, MSESelf = data2Predict.predict(0, featureMatrix,\
-                              classifier=classifiersArray[i], labelValidation = label)
-    print("The model {} tested on the data used for training gives a score of {}".format( classifiersType[i], round(MSESelf,3)))      
-
-
-#%% LOADING OF THE NON-LABELED DATASET:    
+    methodML = "AdaBoost"
+    adaBoostDic={"n_estimators":150, "learning_rate":0.005}
     
+    methodML = "Bagging"
+    baggingDic={"n_estimators":100, "n_jobs":-1, "bootstrap_features": False}
+    
+    methodML = "Gradient Boosting"
+    gradBoostDic={"n_estimators":100, "learning_rate":0.05, "max_depth":1, "loss": "deviance"}
+    
+    methodML = "Random Forest"
+    rdmForrestDic={"n_estimators":300, "criterion":"gini", "class_weight":None, \
+                         "bootstrap":True, "oob_score":True, "n_jobs":-1}
+                         
+    methodML = "SVM"
+    svmDic= {"C": 0.1, "kernel":"poly", "degree":1, "probability":True}
+    
+    methodDic =[svmDic, rdmForrestDic, adaBoostDic, baggingDic, gradBoostDic]
+    methodML = ["SVM", "Random Forest", "AdaBoost", "Bagging", "Gradient Boosting"]
+    
+    
+    methodDic =[rdmForrestDic]
+    methodML = ["Random Forest"]
+    
+    methodDic =[svmDic]
+    methodML = ["SVM"]
+    
+    methodDic =[baggingDic]
+    methodML = ["Bagging"]
+    
+    methodDic =[gradBoostDic]
+    methodML = ["Gradient Boosting"]
+    
+    methodDic =[adaBoostDic]
+    methodML = ["AdaBoost"]
+    
+    methodDic =[svmDic, rdmForrestDic, adaBoostDic, baggingDic, gradBoostDic]
+    methodML = ["SVM", "Random Forest", "AdaBoost", "Bagging", "Gradient Boosting"]
+    
+    methodDic =[svmDic]
+    methodML = ["SVM"]
+    
+    methodDic =[baggingDic]
+    methodML = ["Bagging"]
+    
+    methodDic =[rdmForrestDic]
+    methodML = ["Random Forest"]
+    
+    # balanced_subsample / gini / entropy
+    # Type of kernel:
+    # kernel -->"linear" / "poly" / "rbf" / "sigmoid"
+    #
+    
+    # Number of methods used:
+    nMethods = len(methodML)
+    
+    if nMethods > 1:
+        print("The {} methods to train our model are ".format(nMethods), end="")
+    else:
+        print("The method to train our model is ", end="")
+            
+    for i in range(nMethods):
+        if i < len(methodML)-2:
+            print(methodML[i] + ", ", end="")
+        elif i == len(methodML)-2:
+            print(methodML[i] + " and ", end="")
+        else:
+            print(methodML[i])
+    
+    #% CROSS VALIDATION PREDICTION AND SCORES:    
+    # We use cross validation to check the accuracy (mean-squared error) of the 
+    # chosen features and regularizer parameter (in Ridge or Lasso):
+    if nMethods == 1:
+        score = data2Predict.crossValidation(methodDic, nFold=10,  \
+                                  typeCV="random", methodList=methodML, \
+                                  stepSize = 0.01)
+    else:
+        score, weightModel = data2Predict.crossValidation(methodDic, nFold=10,  \
+                                  typeCV="random", methodList=methodML, \
+                                  stepSize = 0.001)
+        
+    #print("After cross-validation, we obtain a score of {}".format(score))    
+    
+    #%% ENSEMBLE SELECTION:
+    ml = importlib.reload(ml)
+    ensembleSelectionChosen = True
+    
+    # We create an object of the class Prediction to be able to use the functions
+    # of this class in particular for predicting the data:
+    data2Predict = ml.Prediction(featureMatrix, label)  
+    
+    methodDic =[svmDic, rdmForrestDic, adaBoostDic, baggingDic, gradBoostDic]
+    methodML = ["SVM", "Random Forest", "AdaBoost", "Bagging", "Gradient Boosting"]
+    
+    classifierList, weightModel, score = data2Predict.ensembleSelection(methodDic,\
+                                  Ratio=0.7, typeDataset="random", methodList=methodML,\
+                                  stepSize=0.001)
+    ensembleSelectionChosen = False
+    weightModel = np.ones([nMethods])/nMethods
+    #methodDic =[svmDic, rdmForrestDic, adaBoostDic, baggingDic, gradBoostDic]
+    #methodML = ["SVM", "Random Forest", "AdaBoost", "Bagging", "Gradient Boosting"]
+    #%% COMPUTATION OF THE MODEL PARAMETERS ON THE WHOLE LABELED DATASET:
+    
+    if ensembleSelectionChosen is False:
+        # After having checked the accuracy of our feature selection and linear 
+        # regression method, the parameters of our model are determined over the 
+        # whole training dataset:
+        classifierList=[]
+        error=[]   
+        
+        for i in range(nMethods): 
+            classifierList.append(data2Predict.buildClassifier(featureMatrix, \
+                         label, methodDic[i], method=methodML[i]))
+            
+            # Prediction of the data using the model parameters:
+            _, error_i = data2Predict.predict(featureMatrix, method=methodML[i], \
+                                          labelValidation = label, classifier=classifierList[i])
+            error.append(error_i)
+        
+        modelError = np.mean(weightModel*error)
+        print(nMethods)
+        print("Our model tested on the data\
+         used for training gives a score of {}".format(round(modelError,3)))      
+
+else:
+
+    classifiersArray = []
+    
+    classifiersType = []
+    classifiersType.append("RandomForestClassifier")
+    classifiersType.append("SVC")
+    classifiersType.append("GaussianNB")
+    classifiersType.append("GaussianNB_isotonic")
+    classifiersType.append("GaussianNB_sigmoid")
+    classifiersType.append("MLPClassifier")
+    classifiersType.append("KNeighborsClassifier")
+    classifiersType.append("GaussianProcess")
+    classifiersType.append("AdaBoostClassifier")
+    classifiersType.append("VotingClassifier")
+    
+    i = 0
+    for classifier in classifiersType:
+        classifiersArray.append( data2Predict.buildClassifier(featureMatrix, \
+                 label, method = classifier) )
+        i += 1
+    
+    # Prediction of the data using the model parameters:
+    for i in range(len(classifiersArray)):
+        _, MSESelf = data2Predict.predict(method=0, features=featureMatrix,\
+                                  classifier=classifiersArray[i], labelValidation = label)
+        print("The model {} tested on the data used for training gives a score of {}".format( classifiersType[i], round(MSESelf,3)))      
+
+#%% LOADING OF THE NON-LABELED DATASET:        
 ml = importlib.reload(ml)
 
 # Name of the test dataset folder
@@ -221,16 +339,21 @@ strName = "test_"
 
 # Loading of the images from the test dataset and saving in a dictionary:
 datasetTestDic = loadData( path, strDataset, strName, 138 )
+nSampleTest = len(datasetTestDic)
 
 print("\nThe dataset dictionary containing all the 3D images of the test \
-      dataset has been created")        
+      dataset has been created")
+
+# Feature dictionary used for obtaining our best score:
+for k,v in featureDic.items():
+    if ("subhistogram" in featureDic[k]["typeOp"]) or ("histogram" in featureDic[k]["typeOp"]):
+        featureDic[k]["binEdges"] = binEdges
 
 # Extraction of the features of the test dataset:
-featureMatrixTest = featuresExtraction(datasetTestDic, featureDic)
+featureMatrixTest, _ = featuresExtraction(datasetTestDic, featureDic)
 
 
 #%% PREDICTION FOR THE NON-LABELED DATASET:
-
 ml = importlib.reload(ml)
     
 # We create an object of the class Prediction from the test dataset dictionary:        
@@ -238,9 +361,20 @@ unlabeledData= ml.Prediction(featureMatrixTest)
 
 # The labels of the test data set are predicted using the parameters of our 
 #model:
-testPredictionArray = []
-for i in range(len(classifiersArray)):
-    testPredictionArray.append(unlabeledData.predict(0, featureMatrixTest, classifier=classifiersArray[i]))
+if isToUseMethodDic == True:
+    testPrediction = np.zeros([nSampleTest])
+    
+    for i in range(nMethods): 
+        predictionModel = unlabeledData.predict(featureMatrixTest, method=methodML[i], \
+                                      labelValidation = [], classifier=classifierList[i])
+        testPrediction += weightModel[i]*predictionModel
+            
+    print(testPrediction)
+
+else:
+    testPredictionArray = []
+    for i in range(len(classifiersArray)):
+        testPredictionArray.append(unlabeledData.predict(method=0, features=featureMatrixTest, classifier=classifiersArray[i]))
 
 ## Plot the predicted data and the true data:
 #plt.figure(102)
@@ -256,18 +390,33 @@ for i in range(len(classifiersArray)):
 
 print("\n The prediction for the non-labeled dataset")    
 
-#%% WRITING OF THE PREDICTION INTO A .CSV FILE:
-
-# Name of the file which will contain our predictions for the test dataset:
-for i in range(len(classifiersArray)):
-    fileStr = classifiersType[i]+ ".csv"
+#% WRITING OF THE PREDICTION INTO A .CSV FILE:
+if isToUseMethodDic == True:
+    date = (time.strftime("%d-%m-%Y %Hh%Mm%S"))
+    methods = ""
+    
+    # Name of the file which will contain our predictions for the test dataset:
+    for i in range(nMethods):
+        methods += methodML[i] + " "
+    
+    fileStr = methods + date + ".csv"
 
     fileIO = open( path + fileStr,'w' )
     fileIO.write( 'ID,Prediction\n' )
-    answer = testPredictionArray[i][:,1]
+    answer = testPredictionArray[i]
     for i in range( len( answer ) ):
         fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
     fileIO.close()
+else:    
+    for i in range(len(classifiersArray)):
+        fileStr = classifiersType[i]+ ".csv"
+    
+        fileIO = open( path + fileStr,'w' )
+        fileIO.write( 'ID,Prediction\n' )
+        answer = testPredictionArray[i]
+        for i in range( len( answer ) ):
+            fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
+        fileIO.close()
 
 print("\n The prediction has been written in a .csv file")    
 
