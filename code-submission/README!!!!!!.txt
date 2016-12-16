@@ -1,10 +1,8 @@
-THE FINAL ZIP SHOULD BE GENERATED WITH THE FILES INSIDE THE FOLDER MLP2_MACHINE SEARCHING. IF WE DO NOT DO THIS, THE ZIP WILL NOT GET A PASS FROM CHECKSUB.PY
+THE FINAL ZIP SHOULD BE GENERATED WITH THE FILES INSIDE THE FOLDER MLPx_MACHINESEARCHING. IF WE DO NOT DO THIS, THE ZIP WILL NOT GET A PASS FROM CHECKSUB.PY
 
+The script is inside mlp folder.
 
-
-Dear students,
-
-After the experiences with the code submission for MLP1 we have made efforts to improve the code submission process.
+MLPx code submission (x = 1,2,3)
 
 The lines marked with (!) are essential for a successful submission.
 
@@ -14,16 +12,22 @@ Sending the submission
 
 (!) Send your submission-zip as an attachment to ml16-ta@inf.ethz.ch
 
-The subject of the email should be MLP2_teamname
+The subject of the email should be MLPx_teamname
 
 Submission Verification: checkSub.py
+
+Check code submission and detect common mistakes.
 
 (!) Only send your submission after you have run and PASSed this verification.
 
 Command line usage: "python checkSub.py pathToYourSubmissionArchive"
 
-Sample code submission: MLP2_teamname.zip
+checkSub.py can easily be adapted for different x, just set PROJECT=x at the beginning of the code.
 
-This archive shows and describes how the code submission should be structured.
+Sample code submission: MLPx_teamname.zip
+
+Show and describe how the code submission should be structured.
 
 Open the files to view instructions about the individual items.
+
+Replace teamname with the name of your team.
