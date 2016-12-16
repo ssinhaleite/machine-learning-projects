@@ -88,10 +88,13 @@ HammingLoss(y',y) = 1/|D| * ∑i=0|D|−1 ∑j=1|L| (xor(y'_i_j,y_i_j)/|L|)
 
 where
 
--`|D|` is the number of samples (here is the number of test samples, i.e. 138)
-- `|L|` is the number of labels (here is 3)
-- `y` is the ground truth (a 138 × 3 matrix)
-- `y'` is the prediction (a 138 × 3 matrix)
+`|D|` is the number of samples (here is the number of test samples, i.e. 138)
+
+`|L|` is the number of labels (here is 3)
+
+`y` is the ground truth (a 138 × 3 matrix)
+
+`y'` is the prediction (a 138 × 3 matrix)
 
 
 About the code:
