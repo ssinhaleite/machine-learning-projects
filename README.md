@@ -28,7 +28,7 @@ Project 01
 
 Objective:
 ----------
-- Predicting a person's age from his 3D brain magnetic resonance image (MRI). In order to reduce the volume of the data, some specific features are extracted from the MRI. To achieve the age prediction, a labeled dataset is used for training our prediction model using different kind of linear regression techniques (Lasso, Ridge). The accuracy of our model and our feature selection are then estimated by cross-validation. Once our better model selected, we applied it to the test dataset (non-labeled) to predict the patient's age.
+Predicting a person's age from his 3D brain magnetic resonance image (MRI). In order to reduce the volume of the data, some specific features are extracted from the MRI. To achieve the age prediction, a labeled dataset is used for training our prediction model using different kind of linear regression techniques (Lasso, Ridge). The accuracy of our model and our feature selection are then estimated by cross-validation. Once our better model selected, we applied it to the test dataset (non-labeled) to predict the patient's age.
 
 Approach:
 ---------
@@ -45,7 +45,7 @@ To predict a persons age using the MRI information, we used the following approa
 
 Evaluation:
 -----------
-- The evaluation metric for this project is Mean-Squared-Error (MSE). The MSE score, a basic measure of fit, represents the average deviation of the predictions from their true values. The MSE metric weights large deviations much heavier than small deviations. Consequently, it is particularly vulnerable to outliers.
+The evaluation metric for this project is Mean-Squared-Error (MSE). The MSE score, a basic measure of fit, represents the average deviation of the predictions from their true values. The MSE metric weights large deviations much heavier than small deviations. Consequently, it is particularly vulnerable to outliers.
 
 Project 02:
 ===========
@@ -53,14 +53,14 @@ Project 02:
 Objective:
 ----------
 
-- Classifying brain health status from MR images. In this project we classify a person's cognitive health status only from an MR scan of their brain.
+Classifying brain health status from MR images. In this project we classify a person's cognitive health status only from an MR scan of their brain.
 
 Approach:
 ---------
 
 Evaluation:
 -----------
-- The evaluation metric for this project is binary Log-Loss (LL), also known as Cross-Entropy-Loss. The Log-Loss punishes wrong predictions (i.e. false positives and false negatives) compared to the true labels.
+The evaluation metric for this project is binary Log-Loss (LL), also known as Cross-Entropy-Loss. The Log-Loss punishes wrong predictions (i.e. false positives and false negatives) compared to the true labels.
 
 
 
@@ -72,7 +72,7 @@ Objective:
 
 Simultaneously classify a person's gender, age and cognitive health status based on an MR image of their brain. This third project tries to combine the previous efforts (for Project 01 and Project 02) and extends it to a multi-label problem. There are three labels, as mentioned before they are gender(male/female), age(young/old) and cognitive health status(sick/healthy).
 
-Fot the third project we were not allowed to use targets from Project 01 and Project 02.
+For the third project we were not allowed to use targets from Project 01 and Project 02.
 
 Approach:
 ---------
@@ -80,7 +80,7 @@ Approach:
 Evaluation:
 -----------
 
-- For evaluation, we use the Hamming Loss which measures the accuracy for a multi-label classification task. Assume that `y_i_j` are the ground truth labels, where index `i` is the sample number and `j` is the label number. We have three labels, `j ∈ L:={1,...,3}`(1,2,3 respectively for gender, age, and healthy status). Note that all labels are Boolean in this project. For example, if sample 1 is healthy then `y_0_3 = True`. Given Boolean predictions `y'_i_j`, one can compute the Hamming Loss as
+For evaluation, we use the Hamming Loss which measures the accuracy for a multi-label classification task. Assume that `y_i_j` are the ground truth labels, where index `i` is the sample number and `j` is the label number. We have three labels, `j ∈ L:={1,...,3}`(1,2,3 respectively for gender, age, and healthy status). Note that all labels are Boolean in this project. For example, if sample 1 is healthy then `y_0_3 = True`. Given Boolean predictions `y'_i_j`, one can compute the Hamming Loss as
 
 ```
 HammingLoss(y',y) = 1/|D| * ∑i=0|D|−1 ∑j=1|L| (xor(y'_i_j,y_i_j)/|L|)
@@ -88,10 +88,10 @@ HammingLoss(y',y) = 1/|D| * ∑i=0|D|−1 ∑j=1|L| (xor(y'_i_j,y_i_j)/|L|)
 
 where
 
-|D| is the number of samples (here is the number of test samples, i.e. 138)
-|L| is the number of labels (here is 3)
-y is the ground truth (a 138 × 3 matrix)
-y' is the prediction (a 138 × 3 matrix)
+`|D|` is the number of samples (here is the number of test samples, i.e. 138)
+`|L|` is the number of labels (here is 3)
+`y` is the ground truth (a 138 × 3 matrix)
+`y'` is the prediction (a 138 × 3 matrix)
 
 
 About the code:
