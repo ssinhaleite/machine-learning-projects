@@ -5,24 +5,26 @@ import time
 import matplotlib.pyplot as plt
 import imageAnalysis as ia
 
-#for regression
-from sklearn import linear_model
 #for image manipulation
 from skimage.feature import greycomatrix, greycoprops
 from skimage import img_as_ubyte
 from scipy import stats
+#for regression
+from sklearn import linear_model
 #for classification
 import sklearn.svm as svm
 from sklearn.svm import SVC
 from sklearn.metrics import log_loss
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, VotingClassifier, BaggingClassifier, GradientBoostingClassifier
-from sklearn.naive_bayes import GaussianNB
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.neural_network import MLPClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
 from sklearn.linear_model import LogisticRegression
+# for multilabel classification
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.multioutput import MultiOutputClassifier
 
 class Features:
     """ The objects of this class are used to extract the features from a
@@ -149,7 +151,6 @@ class Features:
         featureDic = {"gridOperation": { "nGrid":(15,15,15), "npoly":2, \
             "typeOp":["mean", "var"]} } 
         """
-        
         # Dictionary containing the dataset:
         datasetDic = self.dataset
         
@@ -164,8 +165,8 @@ class Features:
         # space will be divided
         if len(nGrid) == 2:
             nDimension = 2
-#            axis = 2
-            type2D = ["center"]
+            axis = 2
+            type2D = "center"
         else:
             nDimension = 3
             for i in range(2):
@@ -307,26 +308,27 @@ class Features:
                                     stats.mode((gridZone)**(iPolyOrder+1))
                                 elif Op in ["energy"]:
                                     #calcula a GLCM
+                                    gridZone = (gridZone-gridZone.min())/(gridZone.max() - gridZone.min())
                                     gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=False)
                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                     greycoprops(glcm, 'energy')[0, 0]
                                 elif Op in ["contrast"]:
                                     #calcula a GLCM
                                     gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=False)
                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                     greycoprops(glcm, 'contrast')[0, 0]
                                 elif Op in ["dissimilarity"]:
                                     #calcula a GLCM
                                     gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=False)
                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                     greycoprops(glcm, 'dissimilarity')[0, 0]
                                 elif Op in ["homogeneity"]:
                                     #calcula a GLCM
                                     gridZone = img_as_ubyte(gridZone)
-                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=True)
+                                    glcm = greycomatrix(gridZone, [1], [0], symmetric=False, normed=False)
                                     featureMatrix[iX, iY, iOp, iPolyOrder] = \
                                     greycoprops(glcm, 'homogeneity')[0, 0]
                     elif nDimension == 3:
@@ -342,6 +344,11 @@ class Features:
                                         featureMatrix[iX, iY, iZ, iOp, \
                                                       iPolyOrder] = \
                                         np.mean(gridZone)**(iPolyOrder+1)
+
+                                    if Op in ["median"]:
+                                        featureMatrix[iX, iY, iZ, iOp, \
+                                                      iPolyOrder] = \
+                                        np.median(gridZone)**(iPolyOrder+1)
                                         
                                     elif Op in ["max", "Max"]:
                                         featureMatrix[iX, iY, iZ, iOp, \
@@ -442,7 +449,7 @@ class Features:
             arraySort = np.sort(arrayBig)
             
             # Computation of the bin edges:
-            binEdges = [0]
+            binEdges = [arraySort[0]]
     
             # We look for the first non-zero element of the arrayBig:
             minIndex = np.argmin(arraySort[::-1])    
@@ -467,8 +474,7 @@ class Features:
                     binEdges.append(arrayNonZeros[-1])
                 
             binEdges[nBins] *= 1.5
-            
-        
+
         else:
             # Number of subdivisions of the grid along each dimension: 
             nGridX = nGrid[0]
@@ -702,7 +708,8 @@ class Prediction:
         nFeatures -- integer, number of computed features
         
     """
-    def __init__(self, featuresMatrix, label=[]):
+    def __init__(self, featuresMatrix, label=[], multiLabels=[], \
+                 classToLabels=[]):
         """
         Constructuctor of the class Prediction
         """
@@ -712,7 +719,14 @@ class Prediction:
         
         # Labels of the training dataset:
         self.label = label
+
+        # Multilabels in case of multiple classes (classification):
+        self.multiLabels = multiLabels
         
+        # Matrix defining the equivalence between the class number and the 
+        # multiple labels (gender, age, health):
+        self.classToLabels = classToLabels
+
         # Number of elements in the dataset used for computing the features 
         # matrix and number of features computed:
         (self.nSamples, self.nFeatures) = featuresMatrix.shape
@@ -801,7 +815,7 @@ class Prediction:
         return parameters
         
         
-    def buildClassifier( self, featureTraining, label, methodDic=[], method = "LASSO"):
+    def buildClassifier( self, featureTraining, label, methodDic, method = "LASSO"):
         """ To compute the model parameters given the feature matrix and the 
         labels of a training dataset
         
@@ -842,33 +856,11 @@ class Prediction:
             clf = linear_model.RidgeCV( alphas=[0.0, 0.1, 10.0], cv=None, \
                                        fit_intercept=True, normalize=True )
             regression = True
-        elif method == "SVC":
-            clf = SVC(C=1.0, cache_size=200, decision_function_shape='ovr', kernel='rbf', \
-                      probability=True, shrinking=True, verbose=False)
-        elif method == "RandomForestClassifier":
-            clf = RandomForestClassifier(n_estimators=100, criterion='gini',\
-                     bootstrap=True, oob_score=True, n_jobs=-1)
-        elif method == "GaussianNB":
-            clf = GaussianNB()
-        elif method == "GaussianNB_isotonic":
-            clf = CalibratedClassifierCV(GaussianNB(), cv=10, method='isotonic')
-        elif method == "GaussianNB_sigmoid":
-            clf = CalibratedClassifierCV(GaussianNB(), cv=10, method='sigmoid')
-        elif method == "MLPClassifier":
-            clf = MLPClassifier(alpha=0.001, hidden_layer_sizes=500, activation='logistic', solver='adam', shuffle=True)
-        elif method == "KNeighborsClassifier":
-            clf =  KNeighborsClassifier(n_neighbors = 2, algorithm='auto', weights='uniform', n_jobs=-1)
-        elif method == "GaussianProcess":
-            clf = GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True, max_iter_predict=200, n_jobs=-1)
-        elif method == "AdaBoostClassifier":
-            clf = AdaBoostClassifier(n_estimators=100)
-        elif method == "VotingClassifier":
-            clf = VotingClassifier(estimators=[('lr', LogisticRegression(random_state=1)), \
-                                               ('rf', RandomForestClassifier(random_state=1)), \
-                                               ('gnb', CalibratedClassifierCV(GaussianNB(), cv=10, method='isotonic'))],\
-                                               voting='soft', n_jobs=-1)
+
         elif method == "SVM": 
             clf = svm.SVC(**methodDic)
+        elif method == "SVC":
+            clf = SVC(**methodDic)
         elif method == "Random Forest":
             clf = RandomForestClassifier(**methodDic)
         elif method == "AdaBoost":
@@ -877,9 +869,13 @@ class Prediction:
             clf = BaggingClassifier(**methodDic)
         elif method == "Gradient Boosting":
             clf = GradientBoostingClassifier(**methodDic)
-        
-        #label = label.reshape( label.size, 1 )
-        
+        elif method == "Multi SVM":
+            clf = OneVsRestClassifier(svm.SVC(**methodDic))
+        elif method == "Multi Random Forest":
+            clf = OneVsRestClassifier(RandomForestClassifier(**methodDic))
+        elif method == "Multi Output RF":
+            clf = MultiOutputClassifier(RandomForestClassifier(**methodDic), n_jobs=-1)
+
         # We train the chosen SVM algorithm on our (training) feature matrix
         clf.fit( featureTraining, label )
         
@@ -907,26 +903,31 @@ class Prediction:
         OUTPUTS:
             predictedData: 1D np.array, the predicted labels
         """
+        
         # Number of 3D MRI images in the dataset:
         nbSamples = features.shape[0]
 
-        if (classifier):
+        if method in ["Random Forest", "AdaBoost", "Bagging", "Gradient Boosting"]:
             predictedData = classifier.predict_proba( features )[:,1]
             #print(predictedData)
             
-        if method == "SVM":
+        elif method == "SVM":
             predictions = classifier.predict( features )
             predictedData = np.zeros(len(predictions))
             
+            # We change the values predicted by the support vector machine 
+            # classifier: 0-->0.1 and 1-->0.9. This allows reducing the 
+            # logistic score:
             for i in range (len(predictions)):
                 if predictions[i] == 0:
                     predictedData[i] = 0.1  
                 else:
                     predictedData[i] = 0.9
-                        
-            #print(classifier.decision_function(features))
-            
-        elif method is not 0:
+
+        elif method in ["Multi SVM", "Multi Random Forest"]:
+            predictedData = classifier.predict( features )
+
+        else:
             # The first column of the feature matrix should be the bias:
             bias = np.ones([nbSamples,1])
             features = np.concatenate((bias, features), axis=1)
@@ -934,25 +935,40 @@ class Prediction:
             # Prediction of the model for the given dataset:
             predictedData = features.dot( parameters )
         
-        # Computation of the mean squared error of the predicted data:
+        # Computation of the error of the predicted data:
         if len(labelValidation) > 0:
-            predictedData[np.isinf(predictedData)] = 0
-            predictedData[np.isnan(predictedData)] = 0
-            if (classifier):
+            if method in ["Random Forest", "SVM", "AdaBoost", "Bagging", "Gradient Boosting"]:
                 error = log_loss(labelValidation, predictedData)
+                
+            elif method in ["Multi Random Forest", "Multi SVM"]:
+                predictionsMultiple = np.zeros([len(labelValidation), 3])
+                truePrediction = np.zeros([len(labelValidation), 3])
+                for i  in range(len(labelValidation)):
+                    predictionsMultiple[i,:] = self.classToLabels[\
+                                        predictedData[i],:]
+                    
+                    # True labels:
+                    truePrediction[i,:] = self.classToLabels[\
+                                        labelValidation[i],:]
+
+                
+                # Score function:
+                error = np.mean(np.abs(predictionsMultiple - truePrediction))
+                 
                 
             else:
                 error = (np.mean((predictedData - labelValidation)**2)) 
-            
+  
             return predictedData, error
-            
-        return predictedData
+        else:
+            return predictedData
         
                     
     def crossValidation(self, methodDic, nFold=10, typeCV="random", \
                         methodList=["SVM"], stepSize = 0.01):
         """ To compute the model parameters through cros-validation and 
-        estimate the choice of the features by computing the mean-squared error
+        estimate the best weights comination of our models if multiple models
+        are selected:
         
         INPUTS:
             nFold: integer, number of folds (or buckets) used for 
@@ -969,9 +985,9 @@ class Prediction:
         # Number of samples in the training dataset
         nSamples = self.nSamples
         
-        # Number of different methods used for training the model:        
+        # Number of different methods used for training the model:
         nModel = len(methodList)
-        
+
         # We shuffle the indices of the feature matrix in the first dimension 
         # (number of samples)
         if typeCV == "random":
@@ -1009,191 +1025,246 @@ class Prediction:
         # Creation of the array containing the MSE error for each cross 
         # validation
         scoreArray = np.zeros([nFold])
-        score = np.zeros([nModel])         
+        score = np.zeros([nModel])
         
         # Matrix containing all the predictions:
         predictions = np.empty([sampleTrainCV])
         
         # List containing the predicted data computed by all the models 
-        # on the n-th fold:        
-        #predictionFold = []        
-        # List containing all the predictions:        
-        predictMatrix = np.zeros([sampleTrainCV, nModel])        
+        # on the n-th fold:
+        #predictionFold = []
+
+        # List containing all the predictions:
+        predictMatrix = np.zeros([sampleTrainCV, nModel])
+        
+        # Number of steps for which we try to find the best weigth value:
+        nSteps = 1 + 1 / stepSize
+        
+        # range of values where we try to find the best weigth value:
+        rangeVector = np.linspace(0.5, 1, nSteps, endpoint=True)
+
+        # Weigths of the different models used for computing the combined model:
+        weightModel = np.ones([nModel])
+        
+        # True labels:
+        labelTrue = label[:sampleTrainCV]
+        
+        # Computation of the ranking of the different models computed by the 
+        # different techniques:
+        for n, inputMethod in enumerate(methodDic):
+            for i in range(nFold):
                 
-        # Number of steps for which we try to find the best weigth value:        
-        nSteps = 1 + 1 / stepSize        
+                # We divide the all training dataset into K buckets (or folds):
+                indexValid = np.arange(i*samplePerFoldTrain, i*samplePerFoldTrain + sampleValid )
+                indexTrain = np.delete(indices, indexValid)
                 
-        # range of values where we try to find the best weigth value:        
-        rangeVector = np.linspace(0.5, 1, nSteps, endpoint=True)        
-                
-        # Weigths of the different models used for computing the combined model:        
-        weightModel = np.ones([nModel])        
-                
-        # True labels:        
-        labelTrue = label[:sampleTrainCV]        
-                
-        # Computation of the ranking of the different models computed by the         
-        # different techniques:        
-        for n, inputMethod in enumerate(methodDic):        
-            for i in range(nFold):        
-                        
-                # We divide the all training dataset into K buckets (or folds):        
-                indexValid = np.arange(i*samplePerFoldTrain, i*samplePerFoldTrain + sampleValid )        
-                indexTrain = np.delete(indices, indexValid)        
-                        
-                # We compute the model parameters of the chosen technique:        
+                # We compute the model parameters of the chosen technique:
                 clf = self.buildClassifier(featuresMatrix[indexTrain, :], \
-                                           label[indexTrain], methodDic=inputMethod, method=methodList[n])        
-                       
-                # We predict the data with the computed parameters        
-                predictedData, scoreArray[i] = self.predict(features=featuresMatrix[indexValid, :],\
-                                                            method=methodList[n], parameters=[],\
-                                                            labelValidation=label[indexValid], classifier=clf)
-                # We save the predicted data in the appropriate matrix:
-                predictions[i*samplePerFoldTrain : (i+1)*samplePerFoldTrain] = predictedData[:samplePerFoldTrain]
+                                label[indexTrain], methodDic=inputMethod, method=methodList[n])
                 
-            # Score:
-            score[n] = log_loss(labelTrue, predictions)
+               
+                # We predict the data with the computed parameters
+                predictedData, scoreArray[i] = self.predict( \
+                    features=featuresMatrix[indexValid, :], method=methodList[n], \
+                    parameters=[], labelValidation=label[indexValid], classifier=clf)
+                
+                # We save the predicted data in the appropriate matrix:
+                predictions[i*samplePerFoldTrain : (i+1)*samplePerFoldTrain] \
+                            = predictedData[:samplePerFoldTrain]
+
+            
+            # Variance of the model:
+            varianceModel = np.round(np.var(scoreArray),4)
+
+            if methodList[0][:5] == "Multi":
+                # Score array:
+                # 1) Final score (Hamming Loss):
+                # 2) Gender score:
+                # 3) Age score:
+                # 4) Health score:
+                score = - np.ones(4)
+                
+                predictions = predictions.astype(int)
+                # The class number is transformed into the triplet  
+                # (gender, age, health status):
+                predictionsMultiple = np.zeros([sampleTrainCV, 3])
+                for i  in range(sampleTrainCV):
+                    predictionsMultiple[i,:] = self.classToLabels[\
+                                        predictions[i],:]
+                    
+                # True labels:
+                truePrediction = self.multiLabels[:sampleTrainCV]
+                
+                # Score function:
+                score[0] = np.mean(np.abs(predictionsMultiple - truePrediction))
+                
+                # Score for the gender prediction:
+                for i in range(3):
+                    score[i+1] = np.mean(np.abs(predictionsMultiple[:,i] - \
+                        truePrediction[:,i]))
+                score = np.round(score,4)
+                    
+            else:
+                # Score:
+                score[n] = log_loss(labelTrue, predictions)
+                                
+                # Best weighted prediction:
+                predictionBest = predictions
+                
+                # New prediction obtained by weighting the model:
+                predictNew = predictions
+    
+                # Best score achieved:
+                scoreBest = score[n]
+                
+                for k in rangeVector:
+                    predictNew = k*predictionBest
+                    error = log_loss(labelTrue, predictNew)
+                    if error < scoreBest:
+                        scoreBest = error
+                        weightModel[n] = k
+                
+                # Best score of the model n:
+                score[n] = round(scoreBest,4)
+
+            # The predictions of the model n are put into the matrix containing 
+            # all the predictions given by all the models:
+            predictMatrix[:,n] = weightModel[n] * predictions
+                
+            # We compute the overall mean-squared error:
+            #score[n] = round(np.mean(scoreArray),4)
+              
+        
+        # We sort the different models with respect to their scores (from 
+        # the best to the worst):
+        
+        rankIndex = np.argsort(score)
+        print( "rank index is:")
+        print( rankIndex )
+      
+        methodDicOrd = []
+        methodListOrd = []
+    
+        # If there is more than one model, we compute the score for each model:
+        if nModel > 1:
+            score = score[rankIndex]
+            weightModel = weightModel[rankIndex]
+            for i in range(nModel):
+                methodDicOrd.append(methodDic[rankIndex[i]])
+                methodListOrd.append(methodList[rankIndex[i]])
+            predictMatrix = predictMatrix[:, rankIndex] 
+        
+            methodDic = methodDicOrd
+            methodList = methodListOrd
+        
+        # Print the ranking of the different methods and their scores:
+        if nModel == 1:
+            print("{} method performs a score of {}".format(methodList[0], score[0]))
+             
+        # ENSEMBLE SELECTION: Computation of the weigths assigned to each model
+        # in order to determine the best averaged model:
+
+        if nModel > 1:
+
+            # range of values where we try to find the best weigth value:
+            rangeVector = np.linspace(0, 1, nSteps, endpoint=True)
             
             # Best weighted prediction:
-            predictionBest = predictions
+            predictionBest = predictMatrix[:,0]
             
-            # New prediction obtained by weighting the model:        
-            predictNew = predictions      
-  
-            # Best score achieved:        
-            scoreBest = score[n]
-            
-            for k in rangeVector:
-                predictNew = k*predictionBest
-                error = log_loss(labelTrue, predictNew)
-                if error < scoreBest:
-                    scoreBest = error
-                    weightModel[n] = k
-                    
-            # Best score of the model n:
-            score[n] = round(scoreBest,4)
-            
-            # The predictions of the model n are put into the matrix containing
-            # all the predictions given by all the models:        
-            predictMatrix[:,n] = weightModel[n] * predictions 
-      
-            # We compute the overall mean-squared error:        
-            #score[n] = round(np.mean(scoreArray),4)
+            # New prediction obtained by combining the different weighted models:
+            predictNew = predictMatrix[:,0]
 
-        # We sort the different models with respect to their scores (from
-        # the best to the worst):        
-        rankIndex = np.argsort(score)        
-
-        methodDicOrd = []        
-        methodListOrd = []
-     
-        if nModel > 1:        
-            score = score[rankIndex]        
-            weightModel = weightModel[rankIndex]        
-            for i in range(nModel):        
-                methodDicOrd.append(methodDic[rankIndex[i]])        
-                methodListOrd.append(methodList[rankIndex[i]])        
-            predictMatrix = predictMatrix[:, rankIndex]         
+            # Best score achieved:
+            scoreBest = score[0]
+            
+            # We check each model in the order of their score:
+            for n in range(1,nModel):
+                # With a given step, we try to find the weight to assign to 
+                # model in order to obtain a better score:
+                for i in rangeVector:
+                    # The weight i is tried:
+                    predictNew = (1-i)*predictionBest + i*predictMatrix[:,n]
+                    # The error with the weight i is computed:
+                    error = log_loss(labelTrue, predictNew)
+                    
+                    # if we obtain a better (=lower) score we save the weight 
+                    # to assign to our models:
+                    if error < scoreBest: 
+                        scoreBest = error
+                        bestIndex = i
                 
-            methodDic = methodDicOrd        
-            methodList = methodListOrd        
+                # The best weight is then saved:
+                for k in range(n):
+                    weightModel[k] = (1-bestIndex)*weightModel[k]   
+                weightModel[n] = bestIndex * weightModel[n]
                 
-        # Print the ranking of the different methods and their scores:        
-        if nModel == 1:        
-            print("{} method performs a score of {}".format(methodList[0], score[0]))        
-                     
-        # ENSEMBLE SELECTION: Computation of the weigths assigned to each model        
-        # in order to determine the best averaged model:        
-        if nModel > 1:        
-            # range of values where we try to find the best weigth value:        
-            rangeVector = np.linspace(0, 1, nSteps, endpoint=True)        
-                    
-            # Best weighted prediction:        
-            predictionBest = predictMatrix[:,0]        
-                    
-            # New prediction obtained by combining the different weighted models:        
-            predictNew = predictMatrix[:,0]        
-            # Best score achieved:        
-            scoreBest = score[0]        
-                    
-            for n in range(1,nModel):        
-                        
-                for i in rangeVector:        
-                    predictNew = (1-i)*predictionBest + i*predictMatrix[:,n]        
-                    error = log_loss(labelTrue, predictNew)        
-                    if error < scoreBest:        
-                                
-                        scoreBest = error        
-                        bestIndex = i        
-                        
-                for k in range(n):        
-                            
-                    weightModel[k] = (1-bestIndex)*weightModel[k]        
-                           
-                weightModel[n] = bestIndex * weightModel[n]        
-                        
-                predictionBest = np.zeros([sampleTrainCV])        
-                for k in range(n+1):        
-                            
-                    predictionBest += predictMatrix[:,k] * weightModel[k]        
-                    
+                # We compute the prediction with the best weighted combinations 
+                # of our models:
+                predictionBest = np.zeros([sampleTrainCV])
+                for k in range(n+1):
+                    predictionBest += predictMatrix[:,k] * weightModel[k]
+            # We compute the score with the best weighted combinations 
+            # of our models:
             scoreBest = round(scoreBest,4)
-
-        # we sort the label (ascending order) and the predicted data:
-        indexSort = np.argsort(labelTrue)
-        labelSort = np.array(labelTrue[indexSort])
+        
+        if methodList[0][:5] != "Multi":   
+            # we sort the label (ascending order) and the predicted data:
+            indexSort = np.argsort(labelTrue)
+            labelSort = np.array(labelTrue[indexSort])
+            
+            if nModel == 1:
+                predictedDataSort = np.array(predictions[indexSort])
+            else:
+                predictedDataSort = np.array(predictionBest[indexSort])
+            
+            # number of sick people in the dataset:
+            nSick = np.argmax(labelSort) 
+            
+            # Prediction average for the class 0 (sick):
+            predictSickAvg = round(np.mean(predictedDataSort[:nSick-1]),2)
+            
+            # Prediction average for the class 1 (healthy):
+            predictHealthyAvg = round(np.mean(predictedDataSort[nSick:]),2)
+            
+            print("\nMean prediction:\nfor sick people: {}\nfor healthy people:{}".format(predictSickAvg, predictHealthyAvg))
+            if nModel > 1:
+                print("\nRanking of the models:")
+                for k in range(nModel):
+                    print("{}) {}: {}".format(1+k, methodList[k], score[k]))
+                
+                print("--> Ensemble selection: {}".format(scoreBest))
+     
+            noPlot=False
+            if noPlot:
+                # Plot the predicted data and the true data:
+                plt.figure(100)
+                
+                 # X-axis:
+                x = np.linspace(1, sampleTrainCV, sampleTrainCV)
+                    
+                # Plot of the predicted labels:
+                plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
+                         linestyle='--', marker='o')
+                
+                # Plot of the true labels:
+                plt.plot(x, labelSort, color="red", linewidth=1, \
+                         linestyle='--', marker='o')
+               
+                plt.title("Validation of the model")
+                plt.xlabel("Patient number")
+                plt.ylabel("Health condition")
         
         if nModel == 1:
-            predictedDataSort = np.array(predictions[indexSort])
-        else:
-            predictedDataSort = np.array(predictionBest[indexSort])
-        
-        # number of sick people in the dataset:
-        nSick = np.argmax(labelSort) 
-        
-        # Prediction average for the class 0 (sick):
-        predictSickAvg = round(np.mean(predictedDataSort[:nSick-1]),2)
-        
-        # Prediction average for the class 1 (healthy):
-        predictHealthyAvg = round(np.mean(predictedDataSort[nSick:]),2)
-        
-        print("\nMean prediction:\nfor sick people: {}\nfor healthy people:{}".format(predictSickAvg, predictHealthyAvg))
-        if nModel > 1:
-            print("\nRanking of the models:")
-            for k in range(nModel):
-                print("{}) {}: {}".format(1+k, methodList[k], score[k]))
-            
-            print("--> Ensemble selection: {}".format(scoreBest))
-        
-        # Plot the predicted data and the true data:
-        plt.figure(100)
-        
-         # X-axis:
-        x = np.linspace(1, sampleTrainCV, sampleTrainCV)
-            
-        # Plot of the predicted labels:
-        plt.plot(x, predictedDataSort, color="blue", linewidth=1, \
-                 linestyle='--', marker='o')
-        
-        # Plot of the true labels:
-        plt.plot(x, labelSort, color="red", linewidth=1, \
-                 linestyle='--', marker='o')
-       
-        plt.title("Validation of the model")
-        plt.xlabel("Patient number")
-        plt.ylabel("Health condition")
-        
-        if nModel == 1:
-            return score
+            return score, varianceModel
         else:
             return scoreBest, weightModel
-        
+
     def ensembleSelection(self, methodDic, methodList, Ratio=0.8,\
                           typeDataset="random", stepSize=0.001):
 
         """ To compute the model parameters through cros-validation and 
-        estimate the choice of the features by computing the mean-squared error
+        estimate the best weights comination of our models: 
         
         INPUTS:
             nFold: integer, number of folds (or buckets) used for 
@@ -1411,4 +1482,3 @@ class Prediction:
         plt.ylabel("Health condition")
         
         return clf, weightModel, scoreBest
-    
