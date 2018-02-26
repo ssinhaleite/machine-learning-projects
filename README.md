@@ -13,7 +13,7 @@
 * importlib
 * matplotlib
 * sklearn
-* skimage
+* scikit-image
 
 ## Configure:
 
