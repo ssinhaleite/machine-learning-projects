@@ -170,7 +170,8 @@ ml = importlib.reload(ml)
 data2Predict = ml.Prediction(featureMatrix, label)    
 
 #%% indicates if should use dictionary for mehods and ensemble or if it is to use the same kind of classifier n times.
-isToUseMethodDic = False
+# Some work needs to be done to use False.
+isToUseMethodDic = True
 
 if isToUseMethodDic == True:
     #%% METHOD SELECTION AND INPUTS
@@ -307,17 +308,18 @@ else:
     classifiersType = []
     classifiersType.append("RandomForestClassifier")
     classifiersType.append("SVC")
-    classifiersType.append("GaussianNB")
-    classifiersType.append("GaussianNB_isotonic")
-    classifiersType.append("GaussianNB_sigmoid")
+#    classifiersType.append("GaussianNB")
+#    classifiersType.append("GaussianNB_isotonic")
+#    classifiersType.append("GaussianNB_sigmoid")
     classifiersType.append("MLPClassifier")
     classifiersType.append("KNeighborsClassifier")
     classifiersType.append("GaussianProcess")
     classifiersType.append("AdaBoostClassifier")
-    classifiersType.append("VotingClassifier")
+#    classifiersType.append("VotingClassifier")
     
     i = 0
     for classifier in classifiersType:
+        print("\nClassifier: {}".format(classifier))
         classifiersArray.append( data2Predict.buildClassifier(featureMatrix, \
                  label, method = classifier) )
         i += 1
@@ -390,7 +392,7 @@ else:
 
 print("\n The prediction for the non-labeled dataset")    
 
-#% WRITING OF THE PREDICTION INTO A .CSV FILE:
+#% WRITING THE PREDICTION INTO A .CSV FILE:
 if isToUseMethodDic == True:
     date = (time.strftime("%d-%m-%Y %Hh%Mm%S"))
     methods = ""
@@ -403,7 +405,7 @@ if isToUseMethodDic == True:
 
     fileIO = open( path + fileStr,'w' )
     fileIO.write( 'ID,Prediction\n' )
-    answer = testPredictionArray[i]
+    answer = testPrediction
     for i in range( len( answer ) ):
         fileIO.write( str(i+1) + ',' + str(answer[i]).strip('[]') + '\n' )
     fileIO.close()

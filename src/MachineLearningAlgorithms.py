@@ -815,7 +815,7 @@ class Prediction:
         return parameters
         
         
-    def buildClassifier( self, featureTraining, label, methodDic, method = "LASSO"):
+    def buildClassifier( self, featureTraining, label, methodDic=[], method = "LASSO"):
         """ To compute the model parameters given the feature matrix and the 
         labels of a training dataset
         
@@ -860,7 +860,11 @@ class Prediction:
         elif method == "SVM": 
             clf = svm.SVC(**methodDic)
         elif method == "SVC":
-            clf = SVC(**methodDic)
+            if methodDic == []:
+                 clf = SVC(C=1.0, cache_size=200, decision_function_shape='ovr', kernel='rbf', \
+                      probability=True, shrinking=True, verbose=False)
+            else:
+                clf = SVC(**methodDic)
         elif method == "Random Forest":
             clf = RandomForestClassifier(**methodDic)
         elif method == "AdaBoost":
@@ -875,6 +879,28 @@ class Prediction:
             clf = OneVsRestClassifier(RandomForestClassifier(**methodDic))
         elif method == "Multi Output RF":
             clf = MultiOutputClassifier(RandomForestClassifier(**methodDic), n_jobs=-1)
+        elif method == "RandomForestClassifier":
+            clf = RandomForestClassifier(n_estimators=100, criterion='gini',\
+                     bootstrap=True, oob_score=True, n_jobs=-1)
+        elif method == "GaussianNB":
+            clf = GaussianNB()
+        elif method == "GaussianNB_isotonic":
+            clf = CalibratedClassifierCV(GaussianNB(), cv=10, method='isotonic')
+        elif method == "GaussianNB_sigmoid":
+            clf = CalibratedClassifierCV(GaussianNB(), cv=10, method='sigmoid')
+        elif method == "MLPClassifier":
+            clf = MLPClassifier(alpha=0.001, hidden_layer_sizes=500, activation='logistic', solver='adam', shuffle=True)
+        elif method == "KNeighborsClassifier":
+            clf =  KNeighborsClassifier(n_neighbors = 2, algorithm='auto', weights='uniform', n_jobs=-1)
+        elif method == "GaussianProcess":
+            clf = GaussianProcessClassifier(1.0 * RBF(1.0), warm_start=True, max_iter_predict=200, n_jobs=-1)
+        elif method == "AdaBoostClassifier":
+            clf = AdaBoostClassifier(n_estimators=100)
+        elif method == "VotingClassifier":
+            clf = VotingClassifier(estimators=[('lr', LogisticRegression(random_state=1)), \
+                                               ('rf', RandomForestClassifier(random_state=1)), \
+                                               ('gnb', CalibratedClassifierCV(GaussianNB(), cv=10, method='isotonic'))],\
+                                               voting='soft', n_jobs=-1)
 
         # We train the chosen SVM algorithm on our (training) feature matrix
         clf.fit( featureTraining, label )
@@ -1412,6 +1438,7 @@ class Prediction:
 
             # Best score achieved:
             scoreBest = score[0]
+            bestIndex = 0
             
             for n in range(1,nModel):
                 
